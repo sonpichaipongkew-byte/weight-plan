@@ -1,0 +1,22 @@
+{
+  "name": "แผนลดน้ำหนักพยาบาลเข้าเวร",
+  "short_name": "ลดน้ำหนัก",
+  "description": "วางแผนลดน้ำหนักตามเวรพยาบาล คำนวณพลังงาน เมนู วัตถุดิบ และติดตามผล",
+  "lang": "th",
+  "start_url": "./index.html#today",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f1f4f3",
+  "theme_color": "#0c7366",
+  "icons": [
+    {"src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ],
+  "shortcuts": [
+    {"name": "เมนูวันนี้", "url": "./index.html#menu"},
+    {"name": "ซื้อของ", "url": "./index.html#shop"},
+    {"name": "บันทึกน้ำหนัก", "url": "./index.html#progress"}
+  ]
+}
