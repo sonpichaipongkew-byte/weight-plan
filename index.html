@@ -256,16 +256,28 @@ img.avatar{object-fit:cover}
 // ---------- CALC-START (pure functions, no DOM) ----------
 const SHIFTS = {
   OFF:{t:'หยุด', s:'หยุด', full:'วันหยุด', f:1.25},
-  M:{t:'ช', s:'ช เช้า', full:'เวรเช้า 07–15', f:1.40},
-  A:{t:'บ', s:'บ บ่าย', full:'เวรบ่าย 15–23', f:1.40},
-  N:{t:'ด', s:'ด ดึก', full:'เวรดึก 23–07', f:1.35},
-  MA:{t:'ชบ', s:'ชบ ควบ', full:'ควบเช้า-บ่าย 16 ชม.', f:1.55},
-  AN:{t:'บด', s:'บด ควบ', full:'ควบบ่าย-ดึก 16 ชม.', f:1.55},
-  NM:{t:'ดช', s:'ดช ควบ', full:'ควบดึก-เช้า 16 ชม.', f:1.55}
+  M:{t:'ช', s:'ช เช้า', full:'เวรเช้า 08–16', f:1.40},
+  A:{t:'บ', s:'บ บ่าย', full:'เวรบ่าย 16–24', f:1.40},
+  N:{t:'ด', s:'ด ดึก', full:'เวรดึก 00–08 (ลงเวรเที่ยงคืนของคืนก่อน)', f:1.35},
+  MA:{t:'ชบ', s:'ชบ เช้าต่อบ่าย', full:'เช้าต่อบ่าย 08–24 (16 ชม.)', f:1.55},
+  AN:{t:'ดบ', s:'ดบ ดึกต่อบ่าย', full:'ดึก 00–08 + บ่าย 16–24 ในวันเดียวกัน', f:1.55}
 };
+// forward rotation (ดึกโย้หน้า): ด on date X = work 00:00–08:00 of X, i.e. leave for work the evening of X−1
+const SHIFT_HOURS={M:[[480,960]],A:[[960,1440]],N:[[0,480]],MA:[[480,1440]],AN:[[0,480],[960,1440]]};
+const SHIFT_ORDER={N:0,M:1,A:2};
 // shifts with no exercise: rest, but eat as on a normal day
-const NO_EX=['A','MA','AN','NM'];
-const SHIFT_ALIASES = {'หยุด':'OFF','off':'OFF','o':'OFF','x':'OFF','-':'OFF','ว่าง':'OFF','ล':'OFF','ลา':'OFF','ช':'M','m':'M','บ':'A','a':'A','ด':'N','n':'N','ชบ':'MA','ช/บ':'MA','บด':'AN','บ/ด':'AN','ด/บ':'AN','ดบ':'AN','ดช':'NM','ด/ช':'NM','ma':'MA','an':'AN','nm':'NM'};
+const NO_EX=['A','MA','AN'];
+const SHIFT_ALIASES = {'หยุด':'OFF','off':'OFF','o':'OFF','x':'OFF','-':'OFF','ว่าง':'OFF','ล':'OFF','ลา':'OFF','ช':'M','m':'M','บ':'A','a':'A','ด':'N','n':'N','ชบ':'MA','ช/บ':'MA','ดบ':'AN','ด/บ':'AN','บด':'AN','บ/ด':'AN','ma':'MA','an':'AN','na':'AN'};
+// old data may still contain NM (ดช), which this roster no longer uses
+function fixLegacyShifts(st){ if(st&&st.shifts) for(const d in st.shifts) if(!SHIFTS[st.shifts[d]]) st.shifts[d]=st.shifts[d]==='NM'?'N':'OFF'; return st; }
+function shiftOrderWarn(st,date){
+  // backward rotation (e.g. บ then ช next day) leaves only 8 h rest
+  const a=st.shifts[addDays(date,-1)]||'OFF', b=st.shifts[date]||'OFF';
+  const ea=(SHIFT_HOURS[a]||[]).slice(-1)[0], sb=(SHIFT_HOURS[b]||[])[0];
+  if(!ea||!sb) return '';
+  const rest=sb[0]+1440-ea[1];
+  return rest<11*60?`พักระหว่างเวรเพียง ${Math.round(rest/60)} ชม. (${SHIFTS[a].t} → ${SHIFTS[b].t})`:'';
+}
 const EX = {
   walk:{t:'เดินเร็ว', met:4.3}, runwalk:{t:'เดินสลับวิ่ง', met:6.0}, run:{t:'วิ่ง', met:8.3},
   kb:{t:'เคตเทิลเบล', met:8.0}, db:{t:'ดัมเบล/เวท', met:5.0}, bike:{t:'ปั่นจักรยาน', met:6.8}, swim:{t:'ว่ายน้ำ', met:6.0}
@@ -310,7 +322,9 @@ const ING = {
   pumpkin:{t:'ฟักทอง', k:26,p:1,c:6.5,f:0.1, buy:{g:1000,price:35,label:'ฟักทอง 1 กก.',src:'e'}},
   sugar:{t:'น้ำตาล', k:387,p:0,c:100,f:0, buy:{g:1000,price:30,label:'น้ำตาล 1 กก.',src:'e'}},
   honey:{t:'น้ำผึ้ง', k:304,p:0.3,c:82,f:0, buy:{g:500,price:120,label:'น้ำผึ้ง 500 ก.',src:'e'}},
-  granola:{t:'กราโนล่า', k:450,p:10,c:65,f:15, buy:{g:500,price:150,label:'กราโนล่า 500 ก.',src:'e'}}
+  granola:{t:'กราโนล่า', k:450,p:10,c:65,f:15, buy:{g:500,price:150,label:'กราโนล่า 500 ก.',src:'e'}},
+  orange:{t:'ส้ม (เนื้อ)', k:47,p:0.9,c:12,f:0.1, unit:{g:130,t:'ลูก'}, buy:{g:1000,price:60,label:'ส้มสายน้ำผึ้ง 1 กก.',src:'e'}},
+  dragonfruit:{t:'แก้วมังกร (เนื้อ)', k:57,p:1.2,c:13,f:0.4, buy:{g:1000,price:70,label:'แก้วมังกร 1 กก.',src:'e'}}
 };
 const RICE = {
   brown:{t:'ข้าวกล้อง', mix:[['rice_brown',1]], y:2.6},
@@ -378,17 +392,10 @@ const ITEMS = [
  {id:'bf_sandwich', cat:'bf', n:'แซนด์วิชอกไก่โฮลวีต + นมจืดไขมันต่ำ', comp:[['bread',60],['chicken',100],['veg',40],['milk',200]]},
  {id:'bf_sticky', cat:'bf', n:'ข้าวเหนียว + หมูปิ้งสันใน + ไข่ต้ม', comp:[['rice_sticky',40],['pork',100],['egg',50],['sugar',5]]},
  {id:'bf_oats', cat:'bf', n:'โอ๊ตต้มนมจืด + กรีกโยเกิร์ต + กล้วย', comp:[['oats',40],['milk',200],['greekyog',100],['banana',55]]},
- // snacks
- {id:'sn_yog_fruit', cat:'snack', n:'กรีกโยเกิร์ต 150 ก. + ผลไม้', comp:[['greekyog',150],['fruit',120]]},
- {id:'sn_yog_granola', cat:'snack', n:'กรีกโยเกิร์ต 150 ก. + กราโนล่า 20 ก. + น้ำผึ้ง 1 ช้อนชา', comp:[['greekyog',150],['granola',20],['honey',7]]},
- {id:'sn_yog_only', cat:'snack', n:'กรีกโยเกิร์ตล้วน 200 ก.', comp:[['greekyog',200]]},
- {id:'sn_chicken_nuts', cat:'snack', n:'อกไก่ต้ม 100 ก. + อัลมอนด์ 15 ก.', comp:[['chicken',100],['nuts',15]]},
- {id:'sn_egg2', cat:'snack', n:'ไข่ต้ม 2 ฟอง', comp:[['egg',100]]},
- {id:'sn_milk', cat:'snack', n:'นมจืดไขมันต่ำ 200 มล.', comp:[['milk',200]]},
- {id:'sn_soy', cat:'snack', n:'นมถั่วเหลืองไม่หวาน 230 มล.', comp:[['soymilk',230]]},
- {id:'sn_whey', cat:'snack', n:'เวย์โปรตีน 1 สกูป + น้ำ', comp:[['whey',32]]},
- {id:'sn_sweetpotato', cat:'snack', n:'มันเทศนึ่ง 150 ก.', comp:[['sweetpotato',150]]},
- {id:'sn_nuts', cat:'snack', n:'อัลมอนด์ 20 ก.', comp:[['nuts',20]]},
+ // snacks: only Greek yogurt + low-sugar fruit + honey. The same 3 fruits repeat every week (easy shopping)
+ {id:'sn_yog_banana', cat:'snack', n:'กรีกโยเกิร์ต 150 ก. + กล้วยน้ำว้า 1 ลูก + น้ำผึ้ง 1 ช้อนชา', comp:[['greekyog',150],['banana',55],['honey',7]]},
+ {id:'sn_yog_orange', cat:'snack', n:'กรีกโยเกิร์ต 150 ก. + ส้ม 1 ลูก + น้ำผึ้ง 1 ช้อนชา', comp:[['greekyog',150],['orange',130],['honey',7]]},
+ {id:'sn_yog_dragon', cat:'snack', n:'กรีกโยเกิร์ต 150 ก. + แก้วมังกร 150 ก. + น้ำผึ้ง 1 ช้อนชา', comp:[['greekyog',150],['dragonfruit',150],['honey',7]]},
  // fruit
  {id:'fr_guava', cat:'fruit', n:'ฝรั่ง ½ ลูก', m:{k:70,p:1.5,c:15,f:0.5}, comp:[['fruit',140]]},
  {id:'fr_watermelon', cat:'fruit', n:'แตงโม 8–10 คำ', m:{k:60,p:1,c:15,f:0.2}, comp:[['fruit',200]]},
@@ -445,13 +452,12 @@ const ITEMS = [
 ];
 const ITEM_CATS = {bf:'มื้อแรกทำเอง', snack:'อาหารว่าง', fruit:'ผลไม้', dessert:'ของหวาน', drink:'ชา กาแฟ เครื่องดื่ม', '711':'เซเว่น', shop:'ร้านตามสั่ง', custom:'รายการของฉัน / จากรูปถ่าย'};
 const MEAL_TIMES = {
-  NM:['21:00 มื้อหลัก 1 ก่อนเข้าเวรดึก','01:00–02:00 มื้อหลัก 2 (ข้าวน้อยลง)','06:00 มื้อแรกเบาๆ ก่อนต่อเวรเช้า','10:30 ว่าง 1','13:00 ว่าง 2 แล้วกลับบ้านนอน'],
   OFF:['เช้า: มื้อแรก','กลางวัน: มื้อหลัก 1','บ่าย: ว่าง 1','เย็น: มื้อหลัก 2','(ว่าง 2 ถ้าหิว)'],
-  M:['05:30 มื้อแรกก่อนออกบ้าน','11:30 มื้อหลัก 1 (กล่องที่พกมา)','15:30 ว่าง 1 หลังเลิกเวร','18:30 มื้อหลัก 2 ที่บ้าน','21:00 ว่าง 2 ถ้าหิว'],
-  A:['09:00 มื้อแรกหลังตื่น','13:30 มื้อหลัก 1 ก่อนเข้าเวร','17:00 ว่าง 1','19:30 มื้อหลัก 2 กลางเวร','22:00 ว่าง 2 แล้วไม่กินหนักหลังเลิก'],
-  N:['15:00 มื้อแรกหลังตื่น','21:00 มื้อหลัก 1 ก่อนเข้าเวร','01:00–02:00 มื้อหลัก 2 กลางเวร (ข้าวน้อยลง)','02:00–06:00 เลี่ยงของหวาน เน้นน้ำ','05:00 ว่าง (นม/โยเกิร์ต) แล้วกลับไปนอน'],
-  MA:['05:30 มื้อแรก','11:30 มื้อหลัก 1','15:00 ว่าง 1','18:30 มื้อหลัก 2','21:00 ว่าง 2'],
-  AN:['11:00 มื้อแรก','14:00 มื้อหลัก 1','19:30 มื้อหลัก 2','00:30 ว่าง 1','04:00 ว่าง 2 (เบาๆ)']
+  M:['06:30 มื้อแรกก่อนออกบ้าน','12:00 มื้อหลัก 1 (กล่องที่พกมา)','16:30 ว่าง 1 หลังเลิกเวร','19:00 มื้อหลัก 2 ที่บ้าน','21:00 ว่าง 2 ถ้าหิว'],
+  A:['10:00 มื้อแรกหลังตื่น','14:30 มื้อหลัก 1 ก่อนเข้าเวร','18:00 ว่าง 1','20:30 มื้อหลัก 2 กลางเวร','23:00 ว่าง 2 เบาๆ แล้วไม่กินหนักหลังเลิก'],
+  N:['22:30 (คืนก่อน) มื้อแรกเบาๆ ก่อนออกไปเวรดึก','03:00 มื้อหลัก 1 กลางเวร (ข้าวน้อยลง)','03:00–07:00 เลี่ยงของหวาน เน้นน้ำ','08:30 ว่าง 1 หลังลงเวร แล้วกลับไปนอน','15:00 มื้อหลัก 2 หลังตื่น · 19:00 ว่าง 2'],
+  MA:['06:30 มื้อแรก','12:00 มื้อหลัก 1','16:00 ว่าง 1 ตอนต่อเวร','19:30 มื้อหลัก 2','22:30 ว่าง 2 เบาๆ'],
+  AN:['22:30 (คืนก่อน) มื้อแรกเบาๆ ก่อนเวรดึก','03:00 ว่าง 1 กลางเวรดึก','08:30 มื้อหลัก 1 หลังลงเวร แล้วนอนพัก','15:00 มื้อหลัก 2 ก่อนเข้าเวรบ่าย','20:00 ว่าง 2 กลางเวรบ่าย']
 };
 
 function ymd(d){const z=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate());}
@@ -487,7 +493,7 @@ function dayEnergy(st,date){
   const deficit=Math.min(800,0.25*tdee);
   const floor=p.sex==='f'?1200:1500;
   const target=Math.max(floor,Math.round((tdee-deficit+(st.adjust||0))/10)*10);
-  const protein=Math.round(w*p.proteinX);
+  const protein=Math.round(w*healthProteinX(st));
   return {w,sh,noEx,allowance,bmr:B,base,ex,exFull,tdee,deficit:tdee-target,target,protein,floorHit:target===floor};
 }
 function weekExAllowance(st,date,w){
@@ -510,8 +516,8 @@ function dayChoice(st,date){
     rice:d.rice||getMenu(st,menu).rice||st.profile.rice||'brown',
     bf:d.bf!==undefined?d.bf:'bf_egg',
     m1:d.m1||'home', m2:d.m2||'home',
-    s1:d.s1!==undefined?d.s1:'sn_yog_fruit',
-    s2:d.s2!==undefined?d.s2:(w>=80?'sn_chicken_nuts':''),
+    s1:d.s1!==undefined?d.s1:SNACK_ROT[dowIdx(date)%3],
+    s2:d.s2!==undefined?d.s2:(w>=80?SNACK_ROT[(dowIdx(date)+1)%3]:''),
     drinks:d.drinks||['dr_black']
   };
 }
@@ -521,7 +527,7 @@ function planDay(st,date){
   const E=dayEnergy(st,date);
   const ch=dayChoice(st,date);
   const m=getMenu(st,ch.menu);
-  const carbMax=Number(st.profile.carbMax)||0; // % of kcal, 0 = no cap
+  const carbMax=healthCarbMax(st); // % of kcal, 0 = no cap
   // fixed parts
   const slots=[];
   const push=(slot,id)=>{ if(!id||id==='home') return; const it=itemById(st,id); if(it) slots.push({slot,it,m:itemM(it)}); };
@@ -569,6 +575,8 @@ function planDay(st,date){
   if(left>120) notes.push(carbMax&&tot.c*4/E.target*100>=carbMax-1?`ถึงเพดานคาร์บ ${carbMax}% แล้ว ยังเหลือ ${Math.round(left)} kcal เติมด้วยผัก ไข่ ถั่ว หรือเนื้อสัตว์ได้`:`ยังเหลือพลังงาน ${Math.round(left)} kcal เพิ่มผลไม้ นม หรือมันเทศได้`);
   if(left<-80) notes.push(`เกินเป้า ${Math.round(-left)} kcal ลองเปลี่ยนมื้อนอกบ้านหรืออาหารว่างเป็นตัวเลือกที่เบากว่า`);
   if(tot.p<E.protein-10) notes.push(`โปรตีนยังขาด ${Math.round(E.protein-tot.p)} ก. เพิ่มไข่ต้ม อกไก่ หรือกรีกโยเกิร์ต`);
+  for(const s of slots){ const w=healthWarn(st,s.it); if(w) notes.push(`${SLOT_T_CALC[s.slot]||''} "${s.it.n}": ${w}`); }
+  if(boxes>0){ const w=healthWarnMenu(st,m); if(w) notes.push(`เมนูหลัก "${m.n}": ${w}`); }
   const ry=(m.carb&&m.carb.length)?1:RICE[ch.rice].y;
   const pct={p:tot.p*4/Math.max(tot.k,1)*100,c:tot.c*4/Math.max(tot.k,1)*100,f:tot.f*9/Math.max(tot.k,1)*100};
   return {E,ch,menu:m,boxes,slots,fixed,items,main,tot,pct,rice,riceCooked:rice*ry,notes};
@@ -595,7 +603,7 @@ const GROUPS=[['protein','เนื้อสัตว์ ปลา เต้า�
 const GROUP_OF={chicken:'protein',thigh:'protein',pork:'protein',fish:'protein',shrimp:'protein',squid:'protein',mackerel:'protein',tuna:'protein',tofuegg:'protein',firmtofu:'protein',softtofu:'protein',
  egg:'dairy',milk:'dairy',greekyog:'dairy',soymilk:'dairy',whey:'dairy',
  rice_brown:'carb',rice_white:'carb',rice_sticky:'carb',rice_berry:'carb',grains:'carb',glassnoodle:'carb',oats:'carb',bread:'carb',flour:'carb',sweetpotato:'carb',
- veg:'veg',papaya:'veg',pineapple:'veg',fruit:'veg',banana:'veg',pumpkin:'veg'};
+ veg:'veg',papaya:'veg',pineapple:'veg',fruit:'veg',banana:'veg',pumpkin:'veg',orange:'veg',dragonfruit:'veg'};
 function groupOf(k){ if(GROUP_OF[k]) return GROUP_OF[k]; const i=ING[k]; if(!i) return 'pantry'; if(i.p>=12&&i.c<10) return 'protein'; if(i.c>=50) return 'carb'; if(i.k<=60) return 'veg'; return 'pantry'; }
 function kgText(g,k){
   const u=ING[k]&&ING[k].unit; const ml=/มล\./.test(ING[k]?ING[k].t:'');
@@ -607,20 +615,21 @@ function kgText(g,k){
 }
 // ---------- intermittent fasting ----------
 const IF_MODES={off:{t:'ไม่ทำ IF'},'12:12':{t:'12:12 (อด 12 ชม. กิน 12 ชม.)',fast:12},'14:10':{t:'14:10 (อด 14 ชม. กิน 10 ชม.)',fast:14},'16:8':{t:'16:8 (อด 16 ชม. กิน 8 ชม.)',fast:16},'18:6':{t:'18:6 (อด 18 ชม. กิน 6 ชม.)',fast:18}};
-const IF_START={OFF:'10:00',M:'06:30',A:'11:00',N:'19:00',MA:'06:00',AN:'11:00',NM:'19:00'};
-const LONG_SHIFTS=['MA','AN','NM'];
-function ifCfg(st){ const c=st.profile.ifast||{}; return {mode:c.mode||'off',start:Object.assign({},IF_START,c.start||{}),skipLong:c.skipLong!==false}; }
+const IF_START={OFF:'10:00',M:'06:30',A:'10:00',N:'14:00',MA:'06:30',AN:'14:00'};
+const LONG_SHIFTS=['MA','AN'];
+function ifCfg(st){ const c=st.profile.ifast||{}; return {mode:c.mode||'off',start:Object.assign({},IF_START,c.start||{}),day:c.day||{},skipLong:c.skipLong!==false}; }
 function hm2m(s){const [h,m]=String(s).split(':').map(Number);return (h||0)*60+(m||0);}
 function m2hm(x){x=((Math.round(x)%1440)+1440)%1440;return String(Math.floor(x/60)).padStart(2,'0')+':'+String(x%60).padStart(2,'0');}
 function ifSchedule(st,date){
   const c=ifCfg(st); if(c.mode==='off') return null;
   const sh=st.shifts[date]||'OFF';
-  if(c.skipLong&&LONG_SHIFTS.includes(sh)) return {skipped:true,sh};
-  const fast=IF_MODES[c.mode].fast, eat=24-fast, s=hm2m(c.start[sh]||'10:00'), e=s+eat*60;
+  const custom=c.day[date];
+  if(!custom&&c.skipLong&&LONG_SHIFTS.includes(sh)) return {skipped:true,sh};
+  const fast=IF_MODES[c.mode].fast, eat=24-fast, s=hm2m(custom||c.start[sh]||'10:00'), e=s+eat*60;
   const meals=[{t:m2hm(s),label:'มื้อเปิด',slots:['bf','m1'],note:'มื้อแรก + มื้อหลัก 1 (เริ่มด้วยโปรตีนและผัก)'}];
   if(eat>=8) meals.push({t:m2hm(Math.round((s+eat*27)/30)*30),label:'ว่าง',slots:['s1'],note:'อาหารว่าง 1'});
   meals.push({t:m2hm(e-45),label:'มื้อปิด',slots:['m2','s2'],note:'มื้อหลัก 2 + ว่าง 2 กินให้เสร็จก่อนปิดช่วงกิน'});
-  return {mode:c.mode,fast,eat,sh,start:m2hm(s),end:m2hm(e),startMin:s,endMin:e,meals};
+  return {mode:c.mode,fast,eat,sh,custom:!!custom,start:m2hm(s),end:m2hm(e),startMin:s,endMin:e,meals};
 }
 function ifStatus(st,now){
   // now: Date. check today's window and yesterday's (night windows cross midnight)
@@ -634,6 +643,50 @@ function ifStatus(st,now){
   if(S&&!S.skipped&&mins<S.startMin) return {state:'fast',until:S.startMin-mins,S};
   if(T&&!T.skipped) return {state:'fast',until:T.startMin+1440-mins,S:T};
   return null;
+}
+// ---------- snack rotation (same 3 fruits every week) ----------
+const SNACK_ROT=['sn_yog_banana','sn_yog_orange','sn_yog_dragon'];
+const SLOT_T_CALC={bf:'มื้อแรก',m1:'มื้อหลัก 1',m2:'มื้อหลัก 2',s1:'ว่าง 1',s2:'ว่าง 2',drink:'เครื่องดื่ม'};
+function dowIdx(date){ return (parseYmd(date).getDay()+6)%7; }
+// ---------- health conditions ----------
+const HEALTH={
+  dm:{t:'เบาหวาน',tip:'คุมคาร์บไม่เกิน 40% ของพลังงาน เลี่ยงน้ำตาล น้ำผึ้ง ของหวาน เครื่องดื่มหวาน ถ้าใช้ยาลดน้ำตาลหรืออินซูลิน ห้ามทำ IF นานเกิน 14 ชม. โดยไม่ปรึกษาแพทย์ (เสี่ยงน้ำตาลต่ำ)'},
+  htn:{t:'ความดันโลหิตสูง',tip:'จำกัดโซเดียม ไม่เกิน 2,000 มก./วัน ลดน้ำปลา ซีอิ๊ว น้ำจิ้ม อาหารร้านและอาหารแช่แข็ง ซดน้ำแกงน้อยลง'},
+  ckd:{t:'โรคไต',tip:'โปรตีนไม่เกิน 0.8 ก./กก. (หรือตามแพทย์สั่ง) เลี่ยงเวย์โปรตีน คุมโซเดียม ถ้าโพแทสเซียมสูงให้ระวังกล้วย ส้ม มะเขือเทศ'},
+  heart:{t:'โรคหัวใจ',tip:'จำกัดไขมันอิ่มตัวและโซเดียม เลี่ยงกะทิ ของทอด เนื้อติดมัน ไข่แดงไม่เกินวันละ 1 ฟองถ้าไขมันสูง'},
+  liver:{t:'โรคตับ / ไขมันพอกตับ',tip:'งดแอลกอฮอล์ ลดน้ำตาลและฟรุกโตส (น้ำผึ้ง น้ำหวาน) ลดไขมันอิ่มตัว ลดน้ำหนักช้าๆ 0.5–1 กก./สัปดาห์'}
+};
+function healthCfg(st){ const h=st.profile.health||{}; return {list:(h.list||[]).filter(k=>HEALTH[k]),other:h.other||''}; }
+function hasH(st,k){ return healthCfg(st).list.includes(k); }
+function healthProteinX(st){ const x=Number(st.profile.proteinX)||1.5; return hasH(st,'ckd')?Math.min(x,0.8):x; }
+function healthCarbMax(st){ const c=Number(st.profile.carbMax)||0; return hasH(st,'dm')?(c?Math.min(c,40):40):c; }
+function itemIngs(it){ return (it.comp||[]).map(c=>c[0]); }
+function healthWarn(st,it){
+  if(!it) return ''; const H=healthCfg(st).list; if(!H.length) return '';
+  const ing=itemIngs(it), m=itemM(it), w=[];
+  if(H.includes('dm')&&(ing.includes('sugar')||ing.includes('honey')||it.cat==='dessert'||m.c>=45||/หวาน|ไข่มุก/.test(it.n)&&!/ไม่หวาน/.test(it.n))) w.push('มีน้ำตาล/คาร์บสูง (เบาหวาน)'+(ing.includes('honey')?' ตัดน้ำผึ้งออกได้':''));
+  if((H.includes('htn')||H.includes('heart')||H.includes('ckd'))&&(it.cat==='shop'||it.cat==='711'&&m.k>=300)) w.push('โซเดียมสูง (อาหารร้าน/สำเร็จรูป)');
+  if(H.includes('ckd')&&(ing.includes('whey')||/เวย์/.test(it.n))) w.push('โปรตีนเข้มข้น ไม่เหมาะกับโรคไต');
+  if(H.includes('ckd')&&(ing.includes('banana')||ing.includes('orange')||/กล้วย|ส้ม/.test(it.n))) w.push('โพแทสเซียมสูง ถ้าแพทย์ให้คุมโพแทสเซียมให้เปลี่ยนเป็นแก้วมังกร');
+  if((H.includes('heart')||H.includes('liver'))&&(ing.includes('coconut')||m.f>=25)) w.push('ไขมันสูง');
+  if(H.includes('liver')&&(ing.includes('honey')||ing.includes('sugar'))) w.push('มีน้ำตาล (ตับ) ลดหรือตัดน้ำผึ้ง');
+  return [...new Set(w)].join(' · ');
+}
+function healthWarnMenu(st,m){
+  const H=healthCfg(st).list; if(!H.length||!m) return ''; const w=[];
+  const ing=(m.p||[]).map(x=>x[0]).concat((m.x||[]).map(x=>x[0]));
+  if((H.includes('heart')||H.includes('liver'))&&(ing.includes('coconut')||m.c==='tod')) w.push('กะทิ/ของทอด ควรเลือกเมนูต้ม นึ่ง ย่างแทน');
+  if((H.includes('htn')||H.includes('ckd')||H.includes('heart'))&&(m.c==='gaeng'||m.s>=60)) w.push('เครื่องปรุงเค็ม ลดน้ำปลา/น้ำแกงลงครึ่งหนึ่ง');
+  if(H.includes('dm')&&(ing.includes('pineapple')||ing.includes('sugar'))) w.push('มีน้ำตาลหรือผลไม้หวาน');
+  if(H.includes('ckd')&&(ing.includes('mackerel')||ing.includes('tuna'))) w.push('อาหารแปรรูปมีโซเดียม/ฟอสฟอรัสสูง');
+  return w.join(' · ');
+}
+function healthIfWarn(st){
+  const c=ifCfg(st); if(c.mode==='off') return '';
+  const fast=IF_MODES[c.mode].fast;
+  if(hasH(st,'dm')&&fast>14) return 'เป็นเบาหวาน: IF ที่อดเกิน 14 ชม. เสี่ยงน้ำตาลต่ำ โดยเฉพาะถ้าใช้ยา ควรใช้ 12:12 หรือ 14:10 และปรึกษาแพทย์';
+  if(hasH(st,'ckd')||hasH(st,'heart')||hasH(st,'liver')) return 'มีโรคประจำตัว ควรปรึกษาแพทย์ก่อนทำ IF และหยุดทันทีถ้าเวียนหัว ใจสั่น';
+  return '';
 }
 function weeklyAverages(st){
   const g={};
@@ -1995,12 +2048,34 @@ async function signInGoogle(withGmail){
 function keepToken(t){ gToken={t,exp:Date.now()+55*60000}; try{sessionStorage.setItem(PWA_KEYS.gtoken,JSON.stringify(gToken));}catch(e){} }
 function currentToken(){ if(!gToken){try{gToken=JSON.parse(sessionStorage.getItem(PWA_KEYS.gtoken)||'null');}catch(e){}} return gToken&&gToken.exp>Date.now()?gToken.t:null; }
 
-// ---------- AI via Anthropic Messages API ----------
+// ---------- AI: Google Gemini (free tier, default) or Anthropic Claude ----------
+function aiProvider(s){ return s.provider||(s.key&&/^sk-ant/.test(s.key)?'claude':'gemini'); }
+function callAI(prompt,images){ const s=aiSettings(); return aiProvider(s)==='gemini'&&!s.proxy?callGemini(prompt,images):callClaude(prompt,images); }
+async function callGemini(prompt,images){
+  const s=aiSettings();
+  const parts=[];
+  for(const im of (images?(Array.isArray(images)?images:[images]):[])) parts.push({inline_data:{mime_type:'image/jpeg',data:await imgToBase64(im)}});
+  parts.push({text:prompt});
+  const model=s.gmodel||'gemini-2.5-flash';
+  let res;
+  try{ res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(model)+':generateContent',{method:'POST',headers:{'content-type':'application/json','x-goog-api-key':s.gkey},body:JSON.stringify({contents:[{role:'user',parts}],generationConfig:{maxOutputTokens:8192,temperature:0.4}})}); }
+  catch(e){ throw {code:'upstream_error',message:'ต่ออินเทอร์เน็ตไม่ได้'}; }
+  if(res.status===400||res.status===401||res.status===403){ let m='';try{m=(await res.json()).error.message;}catch(e){} if(/API key/i.test(m)||res.status!==400) throw {code:'not_granted',message:'API key ไม่ถูกต้อง'}; throw {code:'upstream_error',message:m||'HTTP 400'}; }
+  if(res.status===429) throw {code:'rate_limited',message:'ใช้โควตาฟรีครบแล้ว รอสักครู่หรือพรุ่งนี้'};
+  if(!res.ok) throw {code:'upstream_error',message:'HTTP '+res.status};
+  const j=await res.json();
+  const c=(j.candidates||[])[0];
+  if(!c&&j.promptFeedback&&j.promptFeedback.blockReason) throw {code:'refused'};
+  const text=((c&&c.content&&c.content.parts)||[]).map(p=>p.text||'').join('');
+  if(!text) throw {code:c&&c.finishReason==='SAFETY'?'refused':'empty_completion'};
+  return text;
+}
 function setupAI(){
   const s=aiSettings();
-  if(!s.key&&!s.proxy){ sampleFn=null; sampleImages=false; return; }
-  const fn=async(input,opts)=>({text:await callClaude(typeof input==='string'?input:input.map(m=>m.content).join('\n\n'),opts&&opts.images)});
-  fn.json=async(prompt,opts)=>parseJsonLoose(await callClaude(prompt+'\n\nReply with the JSON only, no other text.',opts&&opts.images));
+  const ready=s.proxy||(aiProvider(s)==='gemini'?s.gkey:s.key);
+  if(!ready){ sampleFn=null; sampleImages=false; return; }
+  const fn=async(input,opts)=>({text:await callAI(typeof input==='string'?input:input.map(m=>m.content).join('\n\n'),opts&&opts.images)});
+  fn.json=async(prompt,opts)=>parseJsonLoose(await callAI(prompt+'\n\nReply with the JSON only, no other text.',opts&&opts.images));
   fn.limits=async()=>({images:{maxCount:4}});
   sampleFn=fn; sampleImages=true;
 }
@@ -2098,8 +2173,14 @@ function accountCard(){
   </section>
   <section class="card" style="margin-top:12px">
     <div class="spread"><h2>ตั้งค่า AI</h2>${sampleFn?'<span class="pill good">พร้อมใช้</span>':'<span class="pill warn">ยังไม่ได้ตั้งค่า</span>'}</div>
-    <p class="small muted">ใช้กับการอ่านตารางเวรจากรูป ถ่ายรูปอาหาร และสร้างเมนูด้วย AI ต้องมี Anthropic API key (สมัครที่ console.anthropic.com) คีย์เก็บในเครื่องนี้เท่านั้น ไม่ซิงก์ขึ้นบัญชี</p>
-    <div class="grid cols-2">
+    <p class="small muted">ใช้กับการอ่านตารางเวรจากรูป ถ่ายรูปอาหาร และสร้างเมนูด้วย AI คีย์เก็บในเครื่องนี้เท่านั้น ไม่ซิงก์ขึ้นบัญชี</p>
+    <label class="f">ผู้ให้บริการ AI<select id="ai-provider"><option value="gemini" ${aiProvider(s)==='gemini'?'selected':''}>Google Gemini (ฟรี แนะนำ)</option><option value="claude" ${aiProvider(s)==='claude'?'selected':''}>Anthropic Claude (เสียเงิน)</option></select></label>
+    <div class="grid cols-2" id="ai-gemini-box" ${aiProvider(s)==='gemini'?'':'hidden'}>
+      <label class="f">Gemini API key (ฟรี)<input id="ai-gkey" type="password" autocomplete="off" value="${esc(s.gkey||'')}" placeholder="AIza..."></label>
+      <label class="f">โมเดล<select id="ai-gmodel">${[['gemini-2.5-flash','Gemini Flash (แนะนำ อ่านรูปได้)'],['gemini-2.5-flash-lite','Gemini Flash-Lite (เร็ว โควตาฟรีมากกว่า)']].map(([v,t])=>`<option value="${v}" ${(s.gmodel||'gemini-2.5-flash')===v?'selected':''}>${t}</option>`).join('')}</select></label>
+      <p class="small muted" style="grid-column:1/-1">ขอคีย์ฟรี: เข้า <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> ด้วยบัญชี Google กด Create API key แล้วคัดลอกมาวาง ไม่ต้องผูกบัตร รุ่นฟรีมีโควตาต่อนาทีและต่อวัน ใช้คนเดียวเหลือเฟือ (ข้อมูลในรุ่นฟรี Google อาจใช้ปรับปรุงโมเดล)</p>
+    </div>
+    <div class="grid cols-2" id="ai-claude-box" ${aiProvider(s)==='claude'?'':'hidden'}>
       <label class="f">Anthropic API key<input id="ai-key" type="password" autocomplete="off" value="${esc(s.key||'')}" placeholder="sk-ant-..."></label>
       <label class="f">โมเดล<select id="ai-model">${[['claude-haiku-5-5','Haiku (เร็ว ถูกที่สุด)'],['claude-sonnet-5-5','Sonnet (แนะนำ)'],['claude-opus-5-5','Opus (ละเอียดที่สุด แพงกว่า)']].map(([v,t])=>`<option value="${v}" ${(s.model||'claude-sonnet-5-5')===v?'selected':''}>${t}</option>`).join('')}</select></label>
     </div>
@@ -2128,7 +2209,7 @@ document.addEventListener('click',async e=>{
   if(t.id==='pwa-signin'){ await signInGoogle(false); }
   else if(t.id==='pwa-signout'){ if(fb){ await firebase.auth().signOut(); gToken=null; try{sessionStorage.removeItem(PWA_KEYS.gtoken);}catch(err){} toast('ออกจากระบบแล้ว ข้อมูลยังอยู่ในเครื่องนี้'); } }
   else if(t.id==='rep-send'){ sendReportGmail('send'); }
-  else if(t.id==='ai-save'){ saveAiSettings({key:($('#ai-key')||{}).value.trim(),model:($('#ai-model')||{}).value,proxy:($('#ai-proxy')||{}).value.trim(),proxyToken:($('#ai-ptoken')||{}).value.trim()}); setupAI(); render(); toast(sampleFn?'บันทึกแล้ว พร้อมใช้ AI':'ลบการตั้งค่า AI แล้ว'); }
+  else if(t.id==='ai-save'){ saveAiSettings({provider:($('#ai-provider')||{}).value||'gemini',gkey:($('#ai-gkey')||{}).value.trim(),gmodel:($('#ai-gmodel')||{}).value,key:($('#ai-key')||{}).value.trim(),model:($('#ai-model')||{}).value,proxy:($('#ai-proxy')||{}).value.trim(),proxyToken:($('#ai-ptoken')||{}).value.trim()}); setupAI(); render(); toast(sampleFn?'บันทึกแล้ว พร้อมใช้ AI':'ลบการตั้งค่า AI แล้ว'); }
   else if(t.id==='ai-test'){ t.disabled=true; t.textContent='กำลังทดสอบ…'; try{ const r=await sampleFn.json('Reply with {"ok":true}'); toast(r&&r.ok?'AI ใช้งานได้':'AI ตอบกลับแปลกๆ ลองใหม่'); }catch(err){ toast(err&&err.code==='not_granted'?'API key ไม่ถูกต้อง':'เรียก AI ไม่สำเร็จ: '+(err&&(err.message||err.code))); } render(); }
   else if(t.id==='pwa-install'){ if(deferredInstall){ deferredInstall.prompt(); await deferredInstall.userChoice; deferredInstall=null; render(); } }
   else if(t.id==='pwa-install-x'){ installDismissed=true; try{localStorage.setItem('nwp-install-dismissed','1');}catch(err){} render(); }
