@@ -516,8 +516,9 @@ function dayEnergy(st,date){
   const deficit=Math.min(800,0.25*tdee);
   const floor=p.sex==='f'?1200:1500;
   const target=Math.max(floor,Math.round((tdee-deficit+(st.adjust||0))/10)*10);
-  const protein=Math.round(w*healthProteinX(st));
-  return {w,sh,noEx,allowance,bmr:B,base,ex,exFull,tdee,deficit:tdee-target,target,protein,floorHit:target===floor};
+  const pb=proteinBase(st,w);
+  const protein=Math.round(pb.kg*healthProteinX(st));
+  return {pb,w,sh,noEx,allowance,bmr:B,base,ex,exFull,tdee,deficit:tdee-target,target,protein,floorHit:target===floor};
 }
 function weekExAllowance(st,date,w){
   const mon=mondayOf(date); let sum=0,n=0;
@@ -720,6 +721,32 @@ const HEALTH={
 };
 function healthCfg(st){ const h=st.profile.health||{}; return {list:(h.list||[]).filter(k=>HEALTH[k]),other:h.other||''}; }
 function hasH(st,k){ return healthCfg(st).list.includes(k); }
+// ---------- protein from Ideal Body Weight ----------
+const IBW_METHODS={
+  devine:{t:'IBW สูตร Devine (ใช้ในโรงพยาบาล)',f:p=>(p.sex==='f'?45.5:50)+2.3*(p.height-152.4)/2.54},
+  bmi22:{t:'IBW จาก BMI 22',f:p=>22*(p.height/100)**2},
+  thai:{t:'IBW ส่วนสูง − 100 (ชาย) / − 105 (หญิง)',f:p=>p.height-(p.sex==='f'?105:100)},
+  actual:{t:'น้ำหนักตัวปัจจุบัน'}
+};
+function ibwOf(st){ const p=st.profile, m=IBW_METHODS[p.proteinBase]||IBW_METHODS.devine; return m.f?Math.round(m.f(p)*10)/10:null; }
+function proteinBase(st,w){
+  // IBW, but never more than the actual weight (someone lighter than IBW eats for their real weight)
+  const b=IBW_METHODS[st.profile.proteinBase]?st.profile.proteinBase:'devine';
+  if(b==='actual'||!(st.profile.height>100)) return {basis:'actual',kg:w,ibw:null,label:'น้ำหนักตัว'};
+  const ibw=ibwOf(st);
+  return w<ibw?{basis:b,kg:w,ibw,label:'น้ำหนักตัว (ต่ำกว่า IBW)'}:{basis:b,kg:ibw,ibw,label:'IBW'};
+}
+function relockFixed(st,date){
+  const f=st.profile.fixedPortion; if(!(f&&f.on)) return null;
+  const v=freePortion(st,date)||weekFreePortion(st,date); if(v){f.meat=v.meat;f.rice=v.rice;} return v;
+}
+function ensureProteinBase(st,date){
+  // first run after this update: switch to IBW and re-lock the daily meat/rice to the new protein target
+  if(st.profile.proteinBase!==undefined) return st;
+  st.profile.proteinBase='devine';
+  relockFixed(st,date);
+  return st;
+}
 function healthProteinX(st){ const x=Number(st.profile.proteinX)||1.5; return hasH(st,'ckd')?Math.min(x,0.8):x; }
 function healthCarbMax(st){ const c=Number(st.profile.carbMax)||0; return hasH(st,'dm')?(c?Math.min(c,40):40):c; }
 function itemIngs(it){ return (it.comp||[]).map(c=>c[0]); }
@@ -1021,7 +1048,7 @@ function defaults(){
   const shifts={}; pattern.forEach((s,i)=>shifts[addDays(mon,i)]=s);
   return {
     v:2,
-    profile:{sex:'m',age:28,height:170,startWeight:110,goal:65,proteinX:1.5,startDate:TODAY,carbMax:45,rice:'brown'},
+    profile:{sex:'m',age:28,height:170,startWeight:110,goal:65,proteinX:1.5,proteinBase:'devine',startDate:TODAY,carbMax:45,rice:'brown'},
     shifts, ex:{}, days:{}, weighed:{}, custom:[], prices:{}, customIng:{}, customMenus:[],
     weights:[{d:TODAY,w:110}], adjust:0, sample:true, eat:{}, customMeats:{}
   };
@@ -1035,10 +1062,11 @@ function merge(s){
   delete out.menu; delete out.fixed; delete out.fixedDay; out.v=2;
   out.eat=out.eat||{}; out.customMeats=out.customMeats||{};
   ensureFixed(out,TODAY);
+  if(!(s.profile&&s.profile.proteinBase!==undefined)){ out.profile.proteinBase='devine'; relockFixed(out,TODAY); } // data saved before IBW: re-lock to the new protein target
   return out;
 }
 function load(){try{const s=localStorage.getItem('nurse-weight-v1');return s?merge(JSON.parse(s)):null;}catch(e){return null;}}
-let state=ensureFixed(load()||defaults(),TODAY);
+let state=ensureProteinBase(ensureFixed(load()||defaults(),TODAY),TODAY);
 registerCustom(state);
 let dbRef=null, saving=false, pending=false, saveTimer=null, lastSavedJson=null;
 function setStatus(kind,text){const el=document.getElementById('status');el.innerHTML='<span class="dot '+kind+'"></span><span></span>';el.lastChild.textContent=text;}
@@ -1139,11 +1167,11 @@ function viewToday(){
     </section>
     <section class="card">
       <div class="spread"><span class="label">โปรตีนต่อวัน</span>
-        <label class="row small">น้ำหนักตัว ${w} กก. ×
+        <label class="row small">${esc(E.pb.label)} ${E.pb.kg} กก. ×
           <select id="px-quick" aria-label="ตัวคูณโปรตีน">${PX_OPTS.concat(PX_OPTS.includes(Number(p.proteinX))?[]:[Number(p.proteinX)]).sort((a,b)=>a-b).map(v=>`<option value="${v}" ${Number(p.proteinX)===v?'selected':''}>${v}</option>`).join('')}</select></label></div>
       <div><span class="big num">${E.protein}</span><span class="unit">กรัม</span></div>
       <div class="bar" aria-hidden="true"><i style="width:${clamp(P.tot.p/E.protein*100,0,100)}%"></i></div>
-      <div class="small muted">แผนวันนี้ได้ ${Math.round(P.tot.p)} ก.${bmi?` · BMI ${bmi.toFixed(1)}`:''} · คนลดน้ำหนักที่ออกกำลังด้วยเวท ใช้ 1.2–1.6 ก./กก. น้ำหนักตัวก็พอ มากกว่า 2.0 ควรปรึกษาแพทย์ถ้ามีปัญหาไต</div>
+      <div class="small muted">แผนวันนี้ได้ ${Math.round(P.tot.p)} ก.${bmi?` · BMI ${bmi.toFixed(1)}`:''}${E.pb.ibw?` · ${esc(IBW_METHODS[E.pb.basis].t)} ส่วนสูง ${p.height} ซม. = ${E.pb.ibw} กก. (น้ำหนักตอนนี้ ${w} กก.)`:''} · คนลดน้ำหนักที่ออกกำลังด้วยเวท ใช้ 1.2–1.6 ก./กก. ของ IBW มากกว่า 2.0 ควรปรึกษาแพทย์ถ้ามีปัญหาไต เปลี่ยนวิธีคิดได้ที่หน้าตั้งค่า</div>
     </section>
   </div>
   <div class="grid cols-2" style="margin-top:12px">
@@ -1416,7 +1444,8 @@ function viewProfile(){
       <label class="f">ส่วนสูง (ซม.)<input id="p-height" type="number" min="120" max="220" value="${p.height}"></label>
       <label class="f">น้ำหนักเริ่มต้น (กก.)<input id="p-start" type="number" step="0.1" value="${p.startWeight}"></label>
       <label class="f">น้ำหนักเป้าหมาย (กก.)<input id="p-goal" type="number" step="0.1" value="${p.goal}"></label>
-      <label class="f">โปรตีน (เท่าของน้ำหนักตัว, ก./กก.)<input id="p-px" type="number" step="0.1" min="0.8" max="2.5" value="${p.proteinX}"></label>
+      <label class="f">คิดโปรตีนจาก<select id="p-pbase">${Object.entries(IBW_METHODS).map(([k,v])=>`<option value="${k}" ${(p.proteinBase||'devine')===k?'selected':''}>${esc(v.t)}${v.f&&p.height?` = ${Math.round(v.f(p)*10)/10} กก.`:''}</option>`).join('')}</select></label>
+      <label class="f">โปรตีน (ก. ต่อ กก.)<input id="p-px" type="number" step="0.1" min="0.8" max="2.5" value="${p.proteinX}"></label>
       <label class="f">เพดานคาร์โบไฮเดรต (% ของพลังงาน)<select id="p-carb">${[0,30,35,40,45,50,55].map(v=>`<option value="${v}" ${Number(p.carbMax)===v?'selected':''}>${v?v+'%':'ไม่จำกัด'}</option>`).join('')}</select></label>
       <label class="f">ข้าวที่ใช้ประจำ<select id="p-rice">${Object.entries(RICE).map(([k,v])=>`<option value="${k}" ${p.rice===k?'selected':''}>${esc(v.t)}</option>`).join('')}</select></label>
       <label class="f">วันเริ่มแผน (ใช้วนเมนู)<input id="p-startdate" type="date" value="${p.startDate}"></label>
@@ -2013,7 +2042,7 @@ function weekReport(wk){
     '',
     'อาหาร',
     `- พลังงานเป้าเฉลี่ย ${fmt(tK/7)} kcal/วัน · ตามแผน ${fmt(pK/7)} kcal/วัน`,
-    `- โปรตีนตามแผนเฉลี่ย ${Math.round(pP/7)} ก./วัน (เป้า ${Math.round(w*p.proteinX)} ก.)`,
+    `- โปรตีนตามแผนเฉลี่ย ${Math.round(pP/7)} ก./วัน (เป้า ${dayEnergy(state,TODAY).protein} ก.)`,
     `- ค่าวัตถุดิบ ${baht(W.use)} · ซื้อนอกบ้าน ${baht(W.outCost)}`,
     '',
     'เวรและการออกกำลังกาย',
@@ -2130,7 +2159,7 @@ function ifSettingsCard(){
       พลังงานและโปรตีนต่อวันเท่าเดิม IF แค่บีบเวลากินให้สั้นลง ช่วยให้คุมการกินจุบจิบระหว่างเวรได้ง่ายขึ้น
       ระหว่างอดดื่มน้ำเปล่า กาแฟดำ ชาไม่หวาน และโซดาได้ ถ้าเวียนหัว ใจสั่น หรือมือสั่นระหว่างเวร ให้เปิดมื้อทันที ความปลอดภัยของคนไข้สำคัญกว่า
       ถ้ากินยาเบาหวานหรือยาลดความดัน ควรปรึกษาแพทย์ก่อนทำ IF
-      แบบ 18:6 จะกินโปรตีน ${Math.round(currentWeight(state)*state.profile.proteinX)} ก. ใน 6 ชั่วโมงได้ยาก ถ้าเพิ่งเริ่ม แนะนำ 14:10 หรือ 16:8
+      แบบ 18:6 จะกินโปรตีน ${dayEnergy(state,TODAY).protein} ก. ใน 6 ชั่วโมงได้ยาก ถ้าเพิ่งเริ่ม แนะนำ 14:10 หรือ 16:8
     </div>
   </section>`;
 }
@@ -2632,7 +2661,7 @@ document.addEventListener('submit',e=>{
   if(f.classList.contains('exform')){e.preventDefault();const d=f.dataset.date||TODAY;(state.ex[d]=state.ex[d]||[]).push({type:$('.ex-type',f).value,min:Number($('.ex-min',f).value)||30});commit();return;}
   if(f.id==='wform'){e.preventDefault();addWeight(TODAY,$('#w-today').value,$('#waist-today').value);return;}
   if(f.id==='wform2'){e.preventDefault();addWeight($('#w2-date').value,$('#w2-w').value,$('#w2-waist').value);return;}
-  if(f.id==='pform'){e.preventDefault();const p=state.profile;p.sex=$('#p-sex').value;p.age=Number($('#p-age').value);p.height=Number($('#p-height').value);p.startWeight=Number($('#p-start').value);p.goal=Number($('#p-goal').value);p.proteinX=Number($('#p-px').value)||1.5;p.carbMax=Number($('#p-carb').value);p.rice=$('#p-rice').value;p.startDate=$('#p-startdate').value||p.startDate;commit();toast('บันทึกแล้ว');return;}
+  if(f.id==='pform'){e.preventDefault();const p=state.profile;p.sex=$('#p-sex').value;p.age=Number($('#p-age').value);p.height=Number($('#p-height').value);p.startWeight=Number($('#p-start').value);p.goal=Number($('#p-goal').value);const pxOld=p.proteinX+'|'+p.proteinBase+'|'+p.height+'|'+p.sex;p.proteinX=Number($('#p-px').value)||1.5;p.proteinBase=$('#p-pbase').value;p.carbMax=Number($('#p-carb').value);p.rice=$('#p-rice').value;p.startDate=$('#p-startdate').value||p.startDate;const relocked=pxOld!==p.proteinX+'|'+p.proteinBase+'|'+p.height+'|'+p.sex?relockFixed(state,TODAY):null;commit();if(relocked){toast(`โปรตีนเปลี่ยน ปรับปริมาณทุกวันเป็น เนื้อสัตว์ ${relocked.meat} ก. ข้าวสุก ${relocked.rice} ก.`);return;}toast('บันทึกแล้ว');return;}
   if(f.id==='bulk'){e.preventDefault();const start=$('#bulk-start').value;const toks=$('#bulk-text').value.trim().split(/[\s,]+/).filter(Boolean);let i=0,bad=[];for(const t of toks){const k=SHIFT_ALIASES[t.toLowerCase()]||SHIFT_ALIASES[t];if(!k){bad.push(t);continue;}state.shifts[addDays(start,i)]=k;i++;}commit();toast(bad.length?`ใส่ ${i} วัน · ข้ามคำที่ไม่รู้จัก: ${bad.join(' ')}`:`ใส่เวรแล้ว ${i} วัน`);return;}
   if(f.id==='exdlg-form'){e.preventDefault();const dlg=$('#exdlg');const k=$('#dlg-kcal').value;const e2={type:$('#dlg-type').value,min:Number($('#dlg-min').value)||30};if(k!==''){e2.kcal=Number(k);e2.src='นาฬิกา';}(state.ex[dlgDate]=state.ex[dlgDate]||[]).push(e2);dlg.close();commit();return;}
   if(f.id==='meatai-form'){e.preventDefault();meatAi.date=meatAi.date||selDate;runMeatAi($('#meatai-q').value);return;}
@@ -2668,7 +2697,7 @@ document.addEventListener('change',e=>{
   else if(t.id==='if-quick'||t.id==='if-mode'){const c=state.profile.ifast=state.profile.ifast||{};c.mode=t.value;commit();}
   else if(t.id==='if-skip'){const c=state.profile.ifast=state.profile.ifast||{};c.skipLong=t.checked;commit();}
   else if(t.classList.contains('if-start')){const c=state.profile.ifast=state.profile.ifast||{};c.start=Object.assign({},c.start||{},{[t.dataset.sh]:t.value||IF_START[t.dataset.sh]});commit();}
-  else if(t.id==='px-quick'){state.profile.proteinX=Number(t.value);commit();}
+  else if(t.id==='px-quick'){state.profile.proteinX=Number(t.value);const v=relockFixed(state,TODAY);commit();if(v)toast(`ปรับปริมาณทุกวันเป็น เนื้อสัตว์ ${v.meat} ก. ข้าวสุก ${v.rice} ก.`);}
   else if(t.id==='d-pick'){if(t.value){selDate=t.value;render();}}
   else if(t.classList.contains('weigh')){(state.weighed[selDate]=state.weighed[selDate]||{});if(t.value==='')delete state.weighed[selDate][t.dataset.k];else state.weighed[selDate][t.dataset.k]=Number(t.value);commit();}
   else if(t.classList.contains('price-g')||t.classList.contains('price-p')){const k=t.dataset.k;const cur=Object.assign({},ING[k].buy,state.prices[k]||{});const v=Number(t.value);if(!(v>0||(t.classList.contains('price-p')&&v===0)))return;if(t.classList.contains('price-g'))cur.g=v;else cur.price=v;state.prices[k]={g:cur.g,price:cur.price,label:cur.label,src:'u'};commit();}

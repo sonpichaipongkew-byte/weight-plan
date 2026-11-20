@@ -1,5 +1,5 @@
 // Service worker: works offline. Bump VERSION after every update so phones fetch the new files.
-const VERSION = 'v5-2026-11-20';
+const VERSION = 'v6-2026-11-20';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './firebase-config.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png', './icons/apple-touch-icon.png'];
 self.addEventListener('install', e => {
