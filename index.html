@@ -541,6 +541,7 @@ function dayChoice(st,date){
     bf:'', s2:'', // first meal and 2nd snack removed: their share goes to the 2 main meals
     m1:d.m1||'home', m2:d.m2||'home',
     s1:d.s1!==undefined?d.s1:SNACK_ROT[dowIdx(date)%3],
+    fruit:d.fruit&&fruitInfo(st,d.fruit)?d.fruit:'',
     meat:d.meat&&(MEAT_OPTS[d.meat]||((st.customMeats||{})[d.meat]&&ING[d.meat]))?d.meat:'',
     drinks:d.drinks||['dr_black']
   };
@@ -555,7 +556,7 @@ function planDay(st,date,opt={}){
   const carbMax=healthCarbMax(st); // % of kcal, 0 = no cap
   // fixed parts
   const slots=[];
-  const push=(slot,id)=>{ if(!id||id==='home') return; const it=itemById(st,id); if(it) slots.push({slot,it,m:itemM(it)}); };
+  const push=(slot,id)=>{ if(!id||id==='home') return; const it=snackWith(st,itemById(st,id),ch.fruit); if(it) slots.push({slot,it,m:itemM(it)}); };
   push('m1',ch.m1); push('m2',ch.m2); push('s1',ch.s1);
   for(const id of ch.drinks) push('drink',id);
   let fixed={...Z}; for(const s of slots) fixed=addM(fixed,s.m);
@@ -644,6 +645,43 @@ function ensureFixed(st,date){
   st.profile.fixedPortion=f?{on:true,meat:f.meat,rice:f.rice}:{on:false};
   return st;
 }
+// ---------- fruit choice and Greek yogurt brand (snack) ----------
+Object.assign(ING,{
+  guava:{t:'ฝรั่ง',k:68,p:2.6,c:14.3,f:1,buy:{g:1000,price:40,label:'ฝรั่ง 1 กก.',src:'e'}},
+  watermelon:{t:'แตงโม (เนื้อ)',k:30,p:0.6,c:7.6,f:0.2,buy:{g:1000,price:25,label:'แตงโม 1 กก.',src:'e'}},
+  papaya_ripe:{t:'มะละกอสุก',k:43,p:0.5,c:10.8,f:0.3,buy:{g:1000,price:30,label:'มะละกอสุก 1 กก.',src:'e'}},
+  apple:{t:'แอปเปิล',k:52,p:0.3,c:13.8,f:0.2,buy:{g:1000,price:120,label:'แอปเปิล 1 กก.',src:'e'}},
+  mango:{t:'มะม่วงสุก (เนื้อ)',k:60,p:0.8,c:15,f:0.4,buy:{g:1000,price:60,label:'มะม่วงสุก 1 กก.',src:'e'}},
+  banana_hom:{t:'กล้วยหอม',k:89,p:1.1,c:22.8,f:0.3,buy:{g:1000,price:50,label:'กล้วยหอม 1 หวี',src:'e'}},
+  grape:{t:'องุ่น',k:69,p:0.7,c:18.1,f:0.2,buy:{g:500,price:80,label:'องุ่น 500 ก.',src:'e'}},
+  strawberry:{t:'สตรอว์เบอร์รี',k:32,p:0.7,c:7.7,f:0.3,buy:{g:250,price:80,label:'สตรอว์เบอร์รี 250 ก.',src:'e'}},
+  roseapple:{t:'ชมพู่',k:25,p:0.6,c:5.7,f:0.3,buy:{g:1000,price:60,label:'ชมพู่ 1 กก.',src:'e'}},
+  pomelo:{t:'ส้มโอ (เนื้อ)',k:38,p:0.8,c:9.6,f:0,buy:{g:1000,price:70,label:'ส้มโอ 1 ลูก',src:'e'}}
+});
+// one snack serving of each fruit (edible g) and how it looks
+const FRUIT_OPTS={
+  banana:{t:'กล้วยน้ำว้า',g:55,u:'1 ลูก'}, banana_hom:{t:'กล้วยหอม',g:100,u:'1 ลูกเล็ก'}, orange:{t:'ส้ม',g:130,u:'1 ลูก'},
+  dragonfruit:{t:'แก้วมังกร',g:150,u:'½ ลูก'}, guava:{t:'ฝรั่ง',g:120,u:'½ ลูก'}, watermelon:{t:'แตงโม',g:200,u:'10 ชิ้นคำ'},
+  papaya_ripe:{t:'มะละกอสุก',g:150,u:'8 ชิ้นคำ'}, apple:{t:'แอปเปิล',g:130,u:'1 ลูกเล็ก'}, mango:{t:'มะม่วงสุก',g:100,u:'⅓ ลูก'},
+  pineapple:{t:'สับปะรด',g:120,u:'8 ชิ้นคำ'}, grape:{t:'องุ่น',g:100,u:'12 ลูก'}, strawberry:{t:'สตรอว์เบอร์รี',g:150,u:'8–10 ลูก'},
+  roseapple:{t:'ชมพู่',g:200,u:'2 ลูก'}, pomelo:{t:'ส้มโอ',g:150,u:'3 กลีบ'}
+};
+const SNACK_FRUIT_KEYS=['banana','orange','dragonfruit','fruit'];
+function fruitInfo(st,k){ return FRUIT_OPTS[k]||((st.customFruits||{})[k]&&ING[k]?st.customFruits[k]:null); }
+function yogBrand(st){ const k=st.profile.yogurt; return k&&k!=='greekyog'&&ING[k]&&(st.customYogurts||{})[k]?{k,...st.customYogurts[k]}:null; }
+function snackWith(st,it,fruit){
+  // swap the Greek yogurt for the chosen brand (any item) and the fruit in the yogurt snack (snack items)
+  if(!it||!it.comp) return it;
+  const yb=yogBrand(st), isSnack=it.cat==='snack', fi=isSnack&&fruit?fruitInfo(st,fruit):null;
+  let changed=false;
+  const comp=it.comp.map(([k,g])=>{
+    if(k==='greekyog'&&yb){ changed=true; return [yb.k,isSnack&&yb.g?yb.g:g]; }
+    if(fi&&SNACK_FRUIT_KEYS.includes(k)){ changed=true; return [fruit,fi.g]; }
+    return [k,g]; });
+  if(!changed) return it;
+  const nm=isSnack?comp.map(([k,g])=>k==='honey'?'น้ำผึ้ง 1 ช้อนชา':k===fruit&&fi?`${fi.t} ${fi.u||g+' ก.'}`:yb&&k===yb.k?`${yb.t} ${g} ก.`:`${ING[k]?ING[k].t:k} ${g} ก.`).join(' + '):it.n+(yb?` (${yb.t})`:'');
+  return Object.assign({},it,{comp,n:nm});
+}
 function weekShopping(st,wk){
   const g={}; let outCost=0; const outList={};
   for(let i=0;i<7;i++){
@@ -666,8 +704,8 @@ const GROUPS=[['protein','เนื้อสัตว์ ปลา เต้า�
 const GROUP_OF={chicken:'protein',thigh:'protein',pork:'protein',beef:'protein',fish:'protein',shrimp:'protein',squid:'protein',mackerel:'protein',tuna:'protein',tofuegg:'protein',firmtofu:'protein',softtofu:'protein',
  egg:'dairy',milk:'dairy',greekyog:'dairy',soymilk:'dairy',whey:'dairy',
  rice_brown:'carb',rice_white:'carb',rice_sticky:'carb',rice_berry:'carb',grains:'carb',glassnoodle:'carb',oats:'carb',bread:'carb',flour:'carb',sweetpotato:'carb',
- veg:'veg',papaya:'veg',pineapple:'veg',fruit:'veg',banana:'veg',pumpkin:'veg',orange:'veg',dragonfruit:'veg'};
-function groupOf(k){ if(GROUP_OF[k]) return GROUP_OF[k]; if(k.startsWith('x_meat_')) return 'protein'; const i=ING[k]; if(!i) return 'pantry'; if(i.p>=12&&i.c<10) return 'protein'; if(i.c>=50) return 'carb'; if(i.k<=60) return 'veg'; return 'pantry'; }
+ veg:'veg',papaya:'veg',pineapple:'veg',fruit:'veg',banana:'veg',pumpkin:'veg',orange:'veg',dragonfruit:'veg',guava:'veg',watermelon:'veg',papaya_ripe:'veg',apple:'veg',mango:'veg',banana_hom:'veg',grape:'veg',strawberry:'veg',roseapple:'veg',pomelo:'veg'};
+function groupOf(k){ if(GROUP_OF[k]) return GROUP_OF[k]; if(k.startsWith('x_meat_')) return 'protein'; if(k.startsWith('x_fruit_')) return 'veg'; if(k.startsWith('x_yog_')) return 'dairy'; const i=ING[k]; if(!i) return 'pantry'; if(i.p>=12&&i.c<10) return 'protein'; if(i.c>=50) return 'carb'; if(i.k<=60) return 'veg'; return 'pantry'; }
 function kgText(g,k){
   const u=ING[k]&&ING[k].unit; const ml=/มล\./.test(ING[k]?ING[k].t:'');
   if(u) return `${Math.ceil(g/u.g)} ${u.t}`;
@@ -1050,7 +1088,7 @@ function defaults(){
     v:2,
     profile:{sex:'m',age:28,height:170,startWeight:110,goal:65,proteinX:1.5,proteinBase:'devine',startDate:TODAY,carbMax:45,rice:'brown'},
     shifts, ex:{}, days:{}, weighed:{}, custom:[], prices:{}, customIng:{}, customMenus:[],
-    weights:[{d:TODAY,w:110}], adjust:0, sample:true, eat:{}, customMeats:{}
+    weights:[{d:TODAY,w:110}], adjust:0, sample:true, eat:{}, customMeats:{}, customFruits:{}, customYogurts:{}, watch:{}, sleep:{}
   };
 }
 function merge(s){
@@ -1060,7 +1098,7 @@ function merge(s){
   registerCustom(out);
   if(s.menu&&!s.v){ for(const k in s.menu){(out.days[k]=out.days[k]||{}).menu=s.menu[k];} }
   delete out.menu; delete out.fixed; delete out.fixedDay; out.v=2;
-  out.eat=out.eat||{}; out.customMeats=out.customMeats||{};
+  out.eat=out.eat||{}; out.customMeats=out.customMeats||{}; out.customFruits=out.customFruits||{}; out.customYogurts=out.customYogurts||{}; out.watch=out.watch||{}; out.sleep=out.sleep||{};
   ensureFixed(out,TODAY);
   if(!(s.profile&&s.profile.proteinBase!==undefined)){ out.profile.proteinBase='devine'; relockFixed(out,TODAY); } // data saved before IBW: re-lock to the new protein target
   return out;
@@ -1126,13 +1164,13 @@ let rosterAi={file:null,url:null,busy:false,res:null,err:'',name:'',month:TODAY.
 let selDate=TODAY, rosterWeek=mondayOf(TODAY), weighMode=false, catFilter='', photo={file:null,url:null,busy:false,res:null,err:''}, aiMenu={busy:false,res:null,err:'',q:''};
 const SLOT_T={bf:'มื้อแรก',m1:'มื้อหลัก 1',m2:'มื้อหลัก 2',s1:'อาหารว่าง',s2:'ว่าง 2',drink:'เครื่องดื่ม'};
 
-function itemOptions(sel,cats,{none=true,home=false,homeLabel=''}={}){
+function itemOptions(sel,cats,{none=true,home=false,homeLabel='',fruit=''}={}){
   const all=allItems(state);
   let h='';
   if(home) h+=`<option value="home" ${sel==='home'?'selected':''}>${esc(homeLabel)}</option>`;
   if(none) h+=`<option value="" ${!sel?'selected':''}>— ไม่กิน —</option>`;
   for(const c of cats){const list=all.filter(i=>i.cat===c);if(!list.length)continue;
-    h+=`<optgroup label="${esc(ITEM_CATS[c])}">`+list.map(i=>{const m=itemM(i);return `<option value="${i.id}" ${i.id===sel?'selected':''}>${esc(i.n)} · ${Math.round(m.k)} kcal · P ${Math.round(m.p)}${i.price?` · ${baht(i.price)}`:''}</option>`;}).join('')+'</optgroup>';}
+    h+=`<optgroup label="${esc(ITEM_CATS[c])}">`+list.map(i=>{const x=snackWith(state,i,i.id===sel?fruit:'');const m=itemM(x);return `<option value="${i.id}" ${i.id===sel?'selected':''}>${esc(x.n)} · ${Math.round(m.k)} kcal · P ${Math.round(m.p)}${i.price?` · ${baht(i.price)}`:''}</option>`;}).join('')+'</optgroup>';}
   return h;
 }
 function macroBar(P){
@@ -1185,12 +1223,13 @@ function viewToday(){
     <section class="card">
       <div class="spread"><h2>ออกกำลังกายวันนี้</h2><span class="small muted num">${fmt(E.exFull)} kcal</span></div>
       ${E.noEx?`<p class="note warn">วันนี้${esc(SHIFTS[E.sh].full)} งดออกกำลังกาย พักให้เต็มที่ แต่กินได้เท่าวันปกติ${E.allowance?` (บวกพลังงานเฉลี่ยจากวันที่ออกกำลังของสัปดาห์นี้ให้ ${fmt(E.allowance)} kcal)`:''}</p>`:`
-      ${exs.length?'<div class="exlist">'+exs.map(e=>`<span><span>${esc(EX[e.type]?EX[e.type].t:e.type)} ${e.min} นาที${e.src?` <span class="muted">(${esc(e.src)})</span>`:''}</span><span class="num">${fmt(exKcal(e,w))} kcal</span></span>`).join('')+'</div>':'<p class="small muted">ยังไม่มี เพิ่มได้ด้านล่าง หรือรับจากนาฬิกาที่หน้าโปรไฟล์</p>'}
+      ${exs.length?'<div class="exlist">'+exs.map(e=>`<span><span>${esc(EX[e.type]?EX[e.type].t:e.type)} ${e.min} นาที${e.src?` <span class="muted">(${esc(e.src)}${e.name?' · '+esc(e.name):''})</span>`:''}</span><span class="num">${fmt(exKcal(e,w))} kcal</span></span>`).join('')+'</div>':'<p class="small muted">ยังไม่มี เพิ่มได้ด้านล่าง หรือรับจากนาฬิกาที่หน้าโปรไฟล์</p>'}
       ${exForm()}
       ${E.sh==='N'?'<p class="note">หลังเวรดึกห้ามออกกำลังหนัก นอนก่อน</p>':''}`}
     </section>
   </div>
   ${eatCard()}
+  ${balanceCard()}
   ${recipeCard()}
   <section class="card" style="margin-top:12px">
     <div class="spread"><h2>บันทึกน้ำหนักวันนี้</h2><span class="small muted">ชั่งหลังตื่นนอนและเข้าห้องน้ำ</span></div>
@@ -1275,10 +1314,13 @@ function viewMenu(){
     <div class="slots">
       ${slotRow('m1',ch.m1,['bf','711','shop','custom'],{none:false,home:true,homeLabel:mainLabel})}
       ${slotRow('m2',ch.m2,['bf','711','shop','custom'],{none:false,home:true,homeLabel:mainLabel})}
-      ${slotRow('s1',ch.s1,['snack','fruit','dessert','711','custom'])}
+      ${slotRow('s1',ch.s1,['snack','fruit','dessert','711','custom'],{fruit:ch.fruit})}
+      ${snackExtraRows(ch)}
       <div class="slot"><span class="slot-t">เครื่องดื่ม</span><div class="row">${ch.drinks.map((id,j)=>{const it=itemById(state,id);return it?`<span class="tag">${esc(it.n)} <span class="muted num">${Math.round(itemM(it).k)}</span><button class="ghost small" data-drdel="${j}" aria-label="เอาออก">×</button></span>`:'';}).join('')}
         <select id="drink-add" class="searchable" aria-label="เพิ่มเครื่องดื่ม"><option value="">+ เพิ่มเครื่องดื่ม</option>${itemOptions('',['drink','711','custom'],{none:false}).replace('<option value="" selected>— ไม่กิน —</option>','')}</select></div></div>
     </div>
+    ${meatAiCard('fruit')}
+    ${yogCard()}
     ${P.notes.map(n=>`<p class="note warn">${esc(n)}</p>`).join('')}
   </section>
 
@@ -1290,7 +1332,7 @@ function viewMenu(){
       <label class="f">เนื้อสัตว์<select id="meat-sel" class="searchable" aria-label="เนื้อสัตว์" ${P.menu.p&&P.menu.p.length?'':'disabled'}>${meatOptions(getMenu(state,ch.menu),ch.meat)}</select></label>
       ${ownCarb?`<div class="small muted" style="align-self:end">เมนูนี้มีแป้งของตัวเอง (${P.menu.carb.map(([k])=>esc(ING[k].t)).join(', ')}) แอปปรับปริมาณแป้งให้แทนข้าว</div>`:`<label class="f">ข้าว<select id="rice-sel">${Object.entries(RICE).map(([k,v])=>`<option value="${k}" ${k===ch.rice?'selected':''}>${esc(v.t)}</option>`).join('')}</select></label>`}
     </div>
-    ${meatAiCard()}
+    ${meatAiCard('meat')}
     ${fixedPortionCard(P)}
     ${stepsBlock(P.menu)}
     ${P.boxes?`<div class="tablewrap"><table>
@@ -1383,6 +1425,7 @@ function viewProgress(){
     <section class="card"><span class="label">ลดไปแล้ว</span><div><span class="big num">${lost.toFixed(1)}</span><span class="unit">กก.</span></div><div class="bar"><i style="width:${clamp(lost/(p.startWeight-p.goal)*100,0,100)}%"></i></div><span class="small muted">อีก ${(w-p.goal).toFixed(1)} กก. ถึงเป้า</span></section>
     <section class="card"><span class="label">อัตราลดเฉลี่ย</span><div><span class="big num">${adv.rate!=null?adv.rate.toFixed(2):'–'}</span><span class="unit">กก./สัปดาห์</span></div><span class="small muted">${adv.eta?`ถ้าคงอัตรานี้ ถึงเป้าราว ${thDate(addDays(TODAY,adv.eta*7),false)} ${parseYmd(addDays(TODAY,adv.eta*7)).getFullYear()+543}`:'เป้าที่ปลอดภัย 0.5–1 กก./สัปดาห์'}</span></section>
   </div>
+  ${balanceWeekCard()}
   <section class="card" style="margin-top:12px">
     <div class="spread"><h2>น้ำหนักเฉลี่ยรายสัปดาห์</h2>
       <div class="legend"><span><i></i>น้ำหนักเฉลี่ยจริง</span><span><i class="plan"></i>เส้นทางที่ปลอดภัย (−0.75%/สัปดาห์)</span></div></div>
@@ -1463,6 +1506,7 @@ function viewProfile(){
     </tbody></table></div>
     <div class="row"><button id="price-reset" class="ghost">กลับไปใช้ราคาตั้งต้น</button></div>
   </section>
+  ${watchCard()}
   <section class="card" style="margin-top:12px">
     <h2>นาฬิกาออกกำลังกาย</h2>
     <div class="grid cols-2">
@@ -1701,19 +1745,34 @@ function meatOptions(m0,sel){
     +(cm.length?`<optgroup label="ที่ AI หาให้">`+cm.map(([k,v])=>`<option value="${k}" ${k===sel?'selected':''}>${esc(v)} · ${Math.round(ING[k].k)} kcal · P ${Math.round(ING[k].p)}/100 ก.</option>`).join('')+`</optgroup>`:'')
     +`<option value="__ai" data-always="1" data-qt="🔎 ค้นหา &quot;{q}&quot; ด้วย AI">🔎 ไม่มีในรายการ? ค้นหาด้วย AI</option>`;
 }
-// ---------- find any meat with AI ----------
-let meatAi={open:false,busy:false,q:'',res:null,err:'',date:null};
-function meatAiCard(){
-  const show=meatAi.open||meatAi.busy||meatAi.res||meatAi.err;
-  const date=meatAi.date||selDate; const r=meatAi.res;
-  const cm=Object.entries(state.customMeats||{}).filter(([k])=>ING[k]);
-  if(!show) return `<p class="small muted">ไม่มีเนื้อสัตว์ที่ต้องการ? พิมพ์ชื่อในช่องเนื้อสัตว์ แล้วเลือก "ค้นหาด้วย AI" หรือ <button class="ghost small" id="meatai-open">ค้นหาเนื้อสัตว์ด้วย AI</button></p>`;
+// ---------- find a meat or a fruit with AI ----------
+const AI_KIND={
+  meat:{title:'ค้นหาเนื้อสัตว์ด้วย AI',ph:'เช่น อกเป็ด, แซลมอน, ปลากะพง, ตับไก่, เนื้อปู',store:'customMeats',prefix:'x_meat_',field:'meat',
+    ask:'a protein food to cook. If several cuts exist, pick the common lean cut a person losing weight would buy (e.g. skinless breast) and say which in the Thai name. If it is not a meat, fish, seafood, egg or tofu/plant protein, reply {"error":"not_match"}.'},
+  fruit:{title:'ค้นหาผลไม้ด้วย AI',ph:'เช่น ลำไย, เงาะ, กีวี, บลูเบอร์รี่, ฝรั่งกิมจู',store:'customFruits',prefix:'x_fruit_',field:'fruit',
+    ask:'a fruit eaten as a snack with Greek yogurt. Give values for the edible flesh only (no peel, no seeds). Also give one sensible snack serving for someone losing weight, about 50–90 kcal, as grams of edible flesh ("serving_g") and how it looks in Thai ("serving_text", e.g. "8 ชิ้นคำ", "1 ลูก"). If it is not a fruit, reply {"error":"not_match"}.'}
+};
+let meatAi={kind:'meat',open:false,busy:false,q:'',res:null,err:'',date:null};
+function aiReset(){ meatAi={kind:'meat',open:false,busy:false,q:'',res:null,err:'',date:null}; }
+function aiOpen(kind,date,q){ meatAi={kind,open:true,busy:false,q:q||'',res:null,err:'',date:date||selDate}; }
+function aiStart(kind,date,q,goMenu){
+  q=String(q||'').trim(); aiOpen(kind,date,q);
+  if(goMenu&&route()!=='menu') location.hash='#menu';
+  if(q) runMeatAi(q); else render();
+  setTimeout(()=>{ const el=document.getElementById('meatai'); if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); if(!q){ const i=document.getElementById('meatai-q'); if(i) i.focus(); } } },goMenu?300:0);
+}
+function meatAiCard(kind){
+  const K=AI_KIND[kind], mine=meatAi.kind===kind;
+  const show=mine&&(meatAi.open||meatAi.busy||meatAi.res||meatAi.err);
+  const date=meatAi.date||selDate, r=mine?meatAi.res:null;
+  const saved=Object.entries(state[K.store]||{}).filter(([k])=>ING[k]);
+  if(!show) return kind==='meat'?`<p class="small muted">ไม่มีเนื้อสัตว์ที่ต้องการ? พิมพ์ชื่อในช่องเนื้อสัตว์ แล้วเลือก "ค้นหาด้วย AI" หรือ <button class="ghost small" data-aiopen="meat">ค้นหาเนื้อสัตว์ด้วย AI</button></p>`:'';
   return `<div class="howto meatai" id="meatai">
-    <div class="spread"><b>ค้นหาเนื้อสัตว์ด้วย AI</b><button class="ghost small" id="meatai-close" aria-label="ปิด">×</button></div>
+    <div class="spread"><b>${K.title}</b><button class="ghost small" id="meatai-close" aria-label="ปิด">×</button></div>
     ${!sampleFn?`<p class="small muted">ต้องตั้งค่า AI ที่หน้า <a href="#profile">ตั้งค่า</a> ก่อน (Gemini ใช้ฟรี)</p>`:`
-    <form id="meatai-form" class="row"><input id="meatai-q" required value="${esc(meatAi.q)}" placeholder="เช่น อกเป็ด, แซลมอน, ปลากะพง, ตับไก่, เนื้อปู" style="flex:1;min-width:200px" aria-label="ชื่อเนื้อสัตว์">
+    <form id="meatai-form" class="row"><input id="meatai-q" required value="${esc(meatAi.q)}" placeholder="${K.ph}" style="flex:1;min-width:200px" aria-label="ชื่อที่ต้องการค้นหา">
       <button class="primary" type="submit" ${meatAi.busy?'disabled':''}>${meatAi.busy?'กำลังค้นหา…':'ค้นหา'}</button></form>`}
-    ${meatAi.err?`<p class="note warn">${esc(meatAi.err)}</p>`:''}
+    ${mine&&meatAi.err?`<p class="note warn">${esc(meatAi.err)}</p>`:''}
     ${r?`<label class="f">ชื่อ<input id="mai-name" value="${esc(r.name)}"></label>
       <div class="nums">
         <label class="f">kcal/100 ก.<input class="mai-n" data-f="kcal" type="number" min="0" step="0.1" value="${r.kcal}"></label>
@@ -1721,52 +1780,156 @@ function meatAiCard(){
         <label class="f">คาร์บ (ก.)<input class="mai-n" data-f="carbs" type="number" min="0" step="0.1" value="${r.carbs}"></label>
         <label class="f">ไขมัน (ก.)<input class="mai-n" data-f="fat" type="number" min="0" step="0.1" value="${r.fat}"></label>
         <label class="f">ราคา บาท/กก.<input class="mai-n" data-f="price" type="number" min="0" step="1" value="${r.price}"></label>
+        ${kind==='fruit'?`<label class="f">กินครั้งละ (ก.)<input class="mai-n" data-f="serving" type="number" min="10" max="500" step="5" value="${r.serving}"></label><label class="f">ดูเป็น<input id="mai-unit" value="${esc(r.unit)}" placeholder="เช่น 8 ชิ้นคำ"></label>`:''}
       </div>
-      <p class="small muted">ค่าต่อ 100 ก. ดิบ · แหล่งข้อมูล: ${esc(r.source)}${r.note?' · '+esc(r.note):''}</p>
+      ${kind==='fruit'?`<p class="small">ครั้งละ ${r.serving} ก. ≈ <b class="num">${Math.round(r.kcal*r.serving/100)} kcal</b> · คาร์บ ${Math.round(r.carbs*r.serving/100)} ก.</p>`:''}
+      <p class="small muted">ค่าต่อ 100 ก. ${kind==='fruit'?'เนื้อผลไม้':'ดิบ'} · แหล่งข้อมูล: ${esc(r.source)}${r.note?' · '+esc(r.note):''}</p>
       ${r.flag?'<p class="note warn">kcal ไม่ตรงกับ 4×P + 4×C + 9×F ควรตรวจกับฉลากหรือฐานข้อมูลก่อนใช้</p>':''}
-      ${r.p<10?'<p class="note warn">โปรตีนต่ำกว่า 10 ก./100 ก. ต้องกินปริมาณมากจึงจะได้โปรตีนตามเป้า</p>':''}
+      ${kind==='meat'&&r.protein<10?'<p class="note warn">โปรตีนต่ำกว่า 10 ก./100 ก. ต้องกินปริมาณมากจึงจะได้โปรตีนตามเป้า</p>':''}
       <div class="row"><button class="primary" id="meatai-use">บันทึกและใช้กับ ${thDate(date)}</button><button id="meatai-save">บันทึกไว้เลือกภายหลัง</button></div>`:''}
-    ${cm.length?`<div class="small">ที่ AI หาไว้แล้ว: ${cm.map(([k,v])=>`<span class="tag">${esc(v)} <span class="muted num">${Math.round(ING[k].k)} kcal · P ${Math.round(ING[k].p)}</span><button class="ghost small" data-meatdel="${k}" aria-label="ลบ ${esc(v)}">×</button></span>`).join(' ')}</div>`:''}
+    ${saved.length?`<div class="small">ที่ AI หาไว้แล้ว: ${saved.map(([k,v])=>`<span class="tag">${esc(typeof v==='string'?v:v.t)} <span class="muted num">${Math.round(ING[k].k)} kcal · P ${Math.round(ING[k].p)}</span><button class="ghost small" data-aidel="${kind}|${k}" aria-label="ลบ">×</button></span>`).join(' ')}</div>`:''}
   </div>`;
 }
 async function runMeatAi(q){
   q=String(q||'').trim(); if(!q) return;
-  if(!sampleFn){ meatAi=Object.assign(meatAi,{open:true,q,err:'',res:null}); render(); return; }
-  meatAi=Object.assign(meatAi,{open:true,busy:true,q,res:null,err:''}); render();
+  const kind=meatAi.kind, K=AI_KIND[kind];
+  if(!sampleFn){ Object.assign(meatAi,{open:true,q,err:'',res:null}); render(); return; }
+  Object.assign(meatAi,{open:true,busy:true,q,res:null,err:''}); render();
   const el=document.getElementById('meatai'); if(el) el.scrollIntoView({behavior:'smooth',block:'center'});
-  const prompt=`You are a registered dietitian. The user (Thailand) wants to cook with this protein food: "${q}".
-If several cuts exist, pick the common lean cut a person losing weight would buy (e.g. skinless breast) and say which in the Thai name.
-Give nutrition per 100 g RAW edible portion from USDA FoodData Central (name the food and FDC ID if you know it) or the Thai Food Composition Database by INMU, Mahidol University. Use the database values you know; do not invent precision.
-Estimate the Thai retail price per kg in baht (supermarket/Makro).
-If it is not a meat, fish, seafood, egg or tofu/plant protein, reply {"error":"not_protein"}.
-Reply with only JSON: {"name":"ชื่อภาษาไทย (ส่วนที่เลือก)","key":"short_english_snake_case","kcal":0,"protein":0,"carbs":0,"fat":0,"source":"แหล่งข้อมูล","price_per_kg_thb":0,"note":"ข้อแนะนำสั้นๆ ภาษาไทย เช่น ลอกหนัง ตัดมัน วิธีปรุงที่เหมาะ"}`;
+  const prompt=`You are a registered dietitian. The user (Thailand) is looking for ${K.ask}
+Food: "${q}"
+Give nutrition per 100 g ${kind==='fruit'?'edible flesh':'RAW edible portion'} from USDA FoodData Central (name the food and FDC ID if you know it) or the Thai Food Composition Database by INMU, Mahidol University. Use the database values you know; do not invent precision.
+Estimate the Thai retail price per kg in baht (supermarket/market).
+Reply with only JSON: {"name":"ชื่อภาษาไทย","key":"short_english_snake_case","kcal":0,"protein":0,"carbs":0,"fat":0,${kind==='fruit'?'"serving_g":0,"serving_text":"",':''}"source":"แหล่งข้อมูล","price_per_kg_thb":0,"note":"ข้อแนะนำสั้นๆ ภาษาไทย"}`;
   try{
     const r=await sampleFn.json(prompt,{});
     if(r&&r.error) throw {code:'refused'};
     const n=v=>+(Math.max(0,Number(v)||0)).toFixed(1);
-    const res={name:String(r.name||q).slice(0,60),key:String(r.key||'meat').toLowerCase().replace(/[^a-z0-9_]/g,'_').slice(0,30)||'meat',kcal:n(r.kcal),protein:n(r.protein),carbs:n(r.carbs),fat:n(r.fat),price:Math.round(Math.max(0,Number(r.price_per_kg_thb)||0)),source:String(r.source||'ไม่ระบุ').slice(0,140),note:String(r.note||'').slice(0,200)};
-    if(!(res.kcal>0)||!(res.protein>0)) throw {code:'invalid_json'};
-    meatAiCheck(res); meatAi.res=res;
+    const res={name:String(r.name||q).slice(0,60),key:String(r.key||kind).toLowerCase().replace(/[^a-z0-9_]/g,'_').slice(0,30)||kind,kcal:n(r.kcal),protein:n(r.protein),carbs:n(r.carbs),fat:n(r.fat),price:Math.round(Math.max(0,Number(r.price_per_kg_thb)||0)),source:String(r.source||'ไม่ระบุ').slice(0,140),note:String(r.note||'').slice(0,200)};
+    if(kind==='fruit'){ res.serving=Math.round(clamp(Number(r.serving_g)||100,10,500)); res.unit=String(r.serving_text||'').slice(0,30); }
+    if(!(res.kcal>0)||(kind==='meat'&&!(res.protein>0))) throw {code:'invalid_json'};
+    meatAiCheck(res); if(meatAi.kind===kind) meatAi.res=res;
   }catch(e){
     const c=e&&e.code;
-    meatAi.err=c==='refused'?'"'+q+'" ไม่ใช่เนื้อสัตว์หรืออาหารโปรตีน ลองพิมพ์ชื่ออื่น':c==='rate_limited'?'ใช้งานถี่เกินไปหรือโควตาฟรีหมด รอสักครู่แล้วลองใหม่':c==='invalid_json'?'AI ตอบกลับมาไม่ครบ ลองกดค้นหาอีกครั้ง หรือพิมพ์ชื่อให้ชัดขึ้น':'ค้นหาไม่สำเร็จ'+(e&&e.message?': '+e.message:'');
+    meatAi.err=c==='refused'?`"${q}" ไม่ใช่${kind==='fruit'?'ผลไม้':'เนื้อสัตว์หรืออาหารโปรตีน'} ลองพิมพ์ชื่ออื่น`:c==='rate_limited'?'ใช้งานถี่เกินไปหรือโควตาฟรีหมด รอสักครู่แล้วลองใหม่':c==='invalid_json'?'AI ตอบกลับมาไม่ครบ ลองกดค้นหาอีกครั้ง หรือพิมพ์ชื่อให้ชัดขึ้น':'ค้นหาไม่สำเร็จ'+(e&&e.message?': '+e.message:'');
   }
   meatAi.busy=false; render();
 }
-function meatAiCheck(r){ const est=4*r.protein+4*r.carbs+9*r.fat; r.flag=r.kcal>40&&Math.abs(est-r.kcal)/r.kcal>0.2; r.p=r.protein; return r; }
+function meatAiCheck(r){ const est=4*r.protein+4*r.carbs+9*r.fat; r.flag=r.kcal>40&&Math.abs(est-r.kcal)/r.kcal>0.2; return r; }
 function saveMeatAi(use){
   const r=meatAi.res; if(!r) return;
+  const kind=meatAi.kind, K=AI_KIND[kind];
   const nm=(document.getElementById('mai-name')||{}).value; if(nm&&nm.trim()) r.name=nm.trim().slice(0,60);
-  state.customMeats=state.customMeats||{};
-  let key=Object.keys(state.customMeats).find(k=>state.customMeats[k]===r.name&&ING[k]);
-  if(!key) key='x_meat_'+r.key+'_'+Date.now().toString(36);
+  const un=document.getElementById('mai-unit'); if(un) r.unit=un.value.trim().slice(0,30);
+  const store=state[K.store]=state[K.store]||{};
+  let key=Object.keys(store).find(k=>(typeof store[k]==='string'?store[k]:store[k].t)===r.name&&ING[k]);
+  if(!key) key=K.prefix+r.key+'_'+Date.now().toString(36);
   state.customIng[key]={t:r.name,k:r.kcal,p:r.protein,c:r.carbs,f:r.fat,src:r.source,buy:{g:1000,price:r.price||0,label:r.name+' 1 กก. (ราคาประมาณจาก AI)',src:'e'}};
-  state.customMeats[key]=r.name;
+  store[key]=kind==='fruit'?{t:r.name,g:r.serving,u:r.unit||''}:r.name;
   registerCustom(state);
   const date=meatAi.date||selDate;
-  if(use) setDay(date,{meat:key});
-  meatAi={open:false,busy:false,q:'',res:null,err:'',date:null};
-  commit(); toast(use?`ใช้${r.name}กับ ${thDate(date)} แล้ว`:`บันทึก${r.name}แล้ว เลือกได้ในช่องเนื้อสัตว์`);
+  if(use) setDay(date,{[K.field]:key});
+  aiReset();
+  commit(); toast(use?`ใช้${r.name}กับ ${thDate(date)} แล้ว`:`บันทึก${r.name}แล้ว เลือกได้ในรายการ`);
+}
+// ---------- fruit and yogurt pickers ----------
+function fruitOptions(it,sel){
+  const base=((it&&it.comp)||[]).find(([k])=>SNACK_FRUIT_KEYS.includes(k));
+  const bt=base?(FRUIT_OPTS[base[0]]?FRUIT_OPTS[base[0]].t:ING[base[0]].t):'ไม่มีผลไม้';
+  const o=(k,f)=>`<option value="${k}" ${k===sel?'selected':''}>${esc(f.t)} ${esc(f.u||f.g+' ก.')} · ${Math.round(ING[k].k*f.g/100)} kcal</option>`;
+  const cf=Object.entries(state.customFruits||{}).filter(([k])=>ING[k]);
+  return `<option value="" ${!sel?'selected':''}>ตามรายการ (${esc(bt)})</option><optgroup label="ผลไม้">${Object.entries(FRUIT_OPTS).map(([k,f])=>o(k,f)).join('')}</optgroup>`
+    +(cf.length?`<optgroup label="ที่ AI หาให้">${cf.map(([k,f])=>o(k,f)).join('')}</optgroup>`:'')
+    +`<option value="__ai" data-always="1" data-qt="🔎 ค้นหา &quot;{q}&quot; ด้วย AI">🔎 ไม่มีในรายการ? ค้นหาด้วย AI</option>`;
+}
+function yogOptions(sel){
+  const ys=Object.entries(state.customYogurts||{}).filter(([k])=>ING[k]);
+  return `<option value="greekyog" ${!sel||sel==='greekyog'?'selected':''}>ทั่วไป (ค่าเฉลี่ย ${ING.greekyog.k} kcal · P ${ING.greekyog.p}/100 ก.)</option>`
+    +(ys.length?`<optgroup label="ยี่ห้อของฉัน">${ys.map(([k,y])=>`<option value="${k}" ${k===sel?'selected':''}>${esc(y.t)} · ${Math.round(ING[k].k)} kcal · P ${ING[k].p}/100 ก. · ครั้งละ ${y.g} ก.</option>`).join('')}</optgroup>`:'')
+    +`<option value="__add" data-always="1">📷 เพิ่มยี่ห้อ (ถ่ายฉลากให้ AI อ่าน หรือกรอกเอง)</option>`;
+}
+function snackExtraRows(ch){
+  const it=itemById(state,ch.s1);
+  return (it&&it.cat==='snack'?`<label class="slot"><span class="slot-t">ผลไม้</span><select id="fruit-sel" class="searchable" aria-label="ผลไม้ในอาหารว่าง">${fruitOptions(it,ch.fruit)}</select></label>`:'')
+    +`<div class="slot"><span class="slot-t">กรีกโยเกิร์ต</span><select id="yog-sel" class="searchable" aria-label="ยี่ห้อกรีกโยเกิร์ต">${yogOptions(state.profile.yogurt)}</select></div>`;
+}
+// ---------- Greek yogurt brand from a photo of the label ----------
+function yogBlank(){ return {name:'',pack:0,price:0,serving:150,kcal:'',protein:'',carbs:'',fat:'',sugar:0,note:'',flag:false}; }
+function yogBlankState(){ return {open:false,busy:false,files:[],urls:[],res:yogBlank(),err:''}; }
+let yogAi=yogBlankState();
+function yogCheck(r){ const k=Number(r.kcal)||0, est=4*(Number(r.protein)||0)+4*(Number(r.carbs)||0)+9*(Number(r.fat)||0); r.flag=k>40&&Math.abs(est-k)/k>0.2; return r; }
+function yogCard(){
+  if(!yogAi.open) return '';
+  const r=yogAi.res, sv=Number(r.serving)||0, per=v=>Math.round((Number(v)||0)*sv/10)/10;
+  const ys=Object.entries(state.customYogurts||{}).filter(([k])=>ING[k]);
+  return `<div class="howto meatai" id="yogai">
+    <div class="spread"><b>เพิ่มยี่ห้อกรีกโยเกิร์ต</b><button class="ghost small" id="yog-close" aria-label="ปิด">×</button></div>
+    ${sampleFn&&sampleImages?`<p class="small muted">ถ่ายรูปตารางโภชนาการบนถ้วยหรือกล่องให้ตัวเลขชัด ไม่สะท้อนแสง เลือกได้สูงสุด 3 รูป (เช่น ด้านหน้าที่มีชื่อยี่ห้อ + ฉลากโภชนาการ)</p>
+      <div class="row"><input type="file" id="yog-file" accept="image/*" capture="environment" multiple aria-label="รูปฉลาก">
+        <button class="primary" id="yog-go" ${yogAi.files.length&&!yogAi.busy?'':'disabled'}>${yogAi.busy?'กำลังอ่านฉลาก…':'อ่านฉลากด้วย AI'}</button></div>
+      ${yogAi.urls.length?`<div class="row">${yogAi.urls.map(u=>`<img src="${u}" alt="รูปฉลาก" style="height:110px;border-radius:8px">`).join('')}</div>`:''}`
+    :`<p class="small muted">ตั้งค่า AI ที่หน้า <a href="#profile">ตั้งค่า</a> ก่อนจึงจะอ่านฉลากจากรูปได้ ตอนนี้กรอกตัวเลขจากฉลากเองได้</p>`}
+    ${yogAi.err?`<p class="note warn">${esc(yogAi.err)}</p>`:''}
+    <label class="f">ยี่ห้อและชื่อสินค้า<input id="yog-name" value="${esc(r.name)}" placeholder="เช่น ยี่ห้อ กรีกโยเกิร์ต รสธรรมชาติ"></label>
+    <div class="nums">
+      <label class="f">kcal/100 ก.<input class="yog-n" data-f="kcal" type="number" min="0" step="0.1" value="${r.kcal}"></label>
+      <label class="f">โปรตีน (ก.)<input class="yog-n" data-f="protein" type="number" min="0" step="0.1" value="${r.protein}"></label>
+      <label class="f">คาร์บ (ก.)<input class="yog-n" data-f="carbs" type="number" min="0" step="0.1" value="${r.carbs}"></label>
+      <label class="f">ไขมัน (ก.)<input class="yog-n" data-f="fat" type="number" min="0" step="0.1" value="${r.fat}"></label>
+      <label class="f">กินครั้งละ (ก.)<input class="yog-n" data-f="serving" type="number" min="20" max="500" step="5" value="${r.serving}"></label>
+      <label class="f">ขนาดบรรจุ (ก.)<input class="yog-n" data-f="pack" type="number" min="0" step="1" value="${r.pack||''}"></label>
+      <label class="f">ราคาต่อแพ็ก (บาท)<input class="yog-n" data-f="price" type="number" min="0" step="1" value="${r.price||''}"></label>
+    </div>
+    ${Number(r.kcal)>0?`<p class="small">ครั้งละ ${sv} ก. = <b class="num">${Math.round((Number(r.kcal)||0)*sv/100)} kcal</b> · โปรตีน ${per(r.protein)} ก. · คาร์บ ${per(r.carbs)} ก. · ไขมัน ${per(r.fat)} ก.${r.sugar?` · น้ำตาล ${r.sugar} ก./หน่วยบริโภคตามฉลาก`:''}</p>`:''}
+    ${r.note?`<p class="small muted">${esc(r.note)}</p>`:''}
+    ${r.flag?'<p class="note warn">kcal ไม่ตรงกับ 4×P + 4×C + 9×F ตรวจตัวเลขกับฉลากอีกครั้ง</p>':''}
+    ${Number(r.kcal)>0&&Number(r.protein)<6?'<p class="note warn">โปรตีนต่ำกว่า 6 ก./100 ก. น่าจะเป็นโยเกิร์ตธรรมดา ไม่ใช่กรีกโยเกิร์ต</p>':''}
+    <div class="row"><button class="primary" id="yog-save">บันทึกและใช้ยี่ห้อนี้</button><span class="small muted">ใช้แทนกรีกโยเกิร์ตในอาหารว่างทุกวัน และในรายการซื้อของ</span></div>
+    ${ys.length?`<div class="small">ยี่ห้อที่บันทึกไว้: ${ys.map(([k,y])=>`<span class="tag">${esc(y.t)}<button class="ghost small" data-yogdel="${k}" aria-label="ลบ ${esc(y.t)}">×</button></span>`).join(' ')}</div>`:''}
+  </div>`;
+}
+function yogReadForm(){
+  const r=yogAi.res; const nm=document.getElementById('yog-name'); if(nm) r.name=nm.value.trim().slice(0,60);
+  document.querySelectorAll('.yog-n').forEach(i=>{ const v=Math.max(0,Number(i.value)||0); r[i.dataset.f]=['serving','pack','price'].includes(i.dataset.f)?Math.round(v):v; });
+  return yogCheck(r);
+}
+async function runYogAi(){
+  if(!sampleFn||!yogAi.files.length) return;
+  yogReadForm(); yogAi.busy=true; yogAi.err=''; render();
+  const prompt=`Read the nutrition label (ฉลากโภชนาการ / Nutrition Information) of this Greek yogurt or yogurt product sold in Thailand. Use only numbers printed on the package; never guess values that are not visible.
+Thai labels state the serving size as "หนึ่งหน่วยบริโภค" (grams) and values "คุณค่าทางโภชนาการต่อหนึ่งหน่วยบริโภค" (per serving); some also print per 100 g. Also read the net weight of the whole pack ("น้ำหนักสุทธิ"), the brand and the product/flavour name, and the price if a price tag is visible.
+Reply with only JSON: {"brand":"ยี่ห้อ","product":"ชื่อสินค้าและรส","pack_g":0,"serving_g":0,"per_serving":{"kcal":0,"protein":0,"carbs":0,"fat":0},"per100":{"kcal":0,"protein":0,"carbs":0,"fat":0},"sugar_g_per_serving":0,"price_thb":0,"readable":true,"note":"หมายเหตุสั้นๆ ภาษาไทย เช่น ตัวเลขไหนอ่านไม่ชัด"}
+Put 0 for anything not printed. If no nutrition table is readable, set "readable": false.`;
+  try{
+    const r=await sampleFn.json(prompt,{images:yogAi.files});
+    if(!r||typeof r!=='object'||r.readable===false) throw {code:'unreadable'};
+    const n=v=>Math.max(0,Number(v)||0), f1=v=>+v.toFixed(1);
+    const sv=n(r.serving_g), ps=r.per_serving||{}, p1=r.per100||{};
+    let per=null;
+    if(n(p1.kcal)>0) per={kcal:n(p1.kcal),protein:n(p1.protein),carbs:n(p1.carbs),fat:n(p1.fat)};
+    else if(n(ps.kcal)>0&&sv>0) per={kcal:n(ps.kcal)*100/sv,protein:n(ps.protein)*100/sv,carbs:n(ps.carbs)*100/sv,fat:n(ps.fat)*100/sv};
+    if(!per) throw {code:'unreadable'};
+    const pack=Math.round(n(r.pack_g));
+    yogAi.res=yogCheck({name:[r.brand,r.product].filter(Boolean).map(String).join(' ').slice(0,60)||yogAi.res.name||'กรีกโยเกิร์ต',
+      pack,price:Math.round(n(r.price_thb)),serving:pack>=50&&pack<=250?pack:150,
+      kcal:f1(per.kcal),protein:f1(per.protein),carbs:f1(per.carbs),fat:f1(per.fat),sugar:f1(n(r.sugar_g_per_serving)),
+      note:(sv?`ฉลาก: หนึ่งหน่วยบริโภค ${Math.round(sv)} ก. แอปแปลงเป็นต่อ 100 ก. ให้แล้ว `:'')+String(r.note||'').slice(0,160)});
+  }catch(e){
+    const c=e&&e.code;
+    yogAi.err=c==='unreadable'||c==='invalid_json'?'อ่านตัวเลขบนฉลากไม่ได้ ถ่ายใหม่ให้เห็นตารางโภชนาการชัดๆ ไม่สะท้อนแสง หรือกรอกตัวเลขเองด้านล่าง':c==='rate_limited'?'ใช้งานถี่เกินไปหรือโควตาฟรีหมด รอสักครู่แล้วลองใหม่':'อ่านฉลากไม่สำเร็จ'+(e&&e.message?': '+e.message:'');
+  }
+  yogAi.busy=false; render();
+}
+function saveYog(){
+  const r=yogReadForm();
+  if(!r.name){ toast('ใส่ชื่อยี่ห้อก่อน'); return; }
+  if(!(Number(r.kcal)>0)){ toast('ใส่พลังงานต่อ 100 ก. ก่อน'); return; }
+  const key='x_yog_'+Date.now().toString(36);
+  state.customIng[key]={t:r.name,k:Number(r.kcal),p:Number(r.protein)||0,c:Number(r.carbs)||0,f:Number(r.fat)||0,src:'ฉลาก',buy:{g:r.pack||r.serving||150,price:r.price||0,label:r.name+(r.pack?` ${r.pack} ก.`:''),src:r.price?'u':'e'}};
+  state.customYogurts=state.customYogurts||{}; state.customYogurts[key]={t:r.name,g:r.serving||150};
+  state.profile.yogurt=key; registerCustom(state);
+  yogAi.urls.forEach(u=>URL.revokeObjectURL(u)); yogAi=yogBlankState();
+  commit(); toast('ใช้ '+r.name+' ในอาหารว่างแล้ว');
 }
 function portionLine(P){
   if(!P.boxes) return '';
@@ -1798,8 +1961,8 @@ const PORTIONS=[[0,'ไม่ได้กิน'],[0.5,'ครึ่งเดี
 function eatGet(date){ const E=(state.eat=state.eat||{}); const L=E[date]=E[date]||{}; L.extra=L.extra||[]; return L; }
 function eatPeek(date){ return (state.eat||{})[date]||null; }
 function boxMacro(P){ const n=Math.max(P.boxes,1); return {k:P.main.k/n,p:P.main.p/n,c:P.main.c/n,f:P.main.f/n}; }
-function eatItemM(P,id){ if(!id) return {...Z}; if(id==='home') return P.boxes?boxMacro(P):{...Z}; return itemM(itemById(state,id)); }
-function eatItemName(P,id){ if(id==='home') return 'กล่องทำเอง: '+menuName(P.menu); const it=itemById(state,id); return it?it.n:'(รายการถูกลบ)'; }
+function eatItemM(P,id){ if(!id) return {...Z}; if(id==='home') return P.boxes?boxMacro(P):{...Z}; return itemM(snackWith(state,itemById(state,id),P.ch.fruit)); }
+function eatItemName(P,id){ if(id==='home') return 'กล่องทำเอง: '+menuName(P.menu); const it=snackWith(state,itemById(state,id),P.ch.fruit); return it?it.n:'(รายการถูกลบ)'; }
 function eatenTotal(date){
   const P=planDay(state,date), L=eatPeek(date); let t={...Z}, n=0;
   if(L){
@@ -1831,7 +1994,7 @@ function eatCard(){
     const e=L[slot], plan=P.ch[slot]||'', id=e?e.id:plan, x=e?e.x:1, m=eatItemM(P,id);
     return `<div class="eat-row"><button class="chk ${e?'on':''}" data-eat="${slot}" aria-pressed="${!!e}" aria-label="${e?'ยกเลิกบันทึก':'กินตามแผนแล้ว'} ${SLOT_T[slot]}"></button>
       <div class="eat-main"><span class="slot-t">${SLOT_T[slot]}${e?'':' <span class="muted">· ยังไม่บันทึก</span>'}</span>
-        <select class="eat-sel searchable" data-slot="${slot}" aria-label="${SLOT_T[slot]} กินอะไร">${id?'':'<option value="" selected>— ไม่ได้วางแผนไว้ เลือกสิ่งที่กิน —</option>'}${itemOptions(id,EAT_CATS,homeOpt)}</select></div>
+        <select class="eat-sel searchable" data-slot="${slot}" aria-label="${SLOT_T[slot]} กินอะไร">${id?'':'<option value="" selected>— ไม่ได้วางแผนไว้ เลือกสิ่งที่กิน —</option>'}${itemOptions(id,EAT_CATS,slot==='s1'?Object.assign({},homeOpt,{fruit:P.ch.fruit}):homeOpt)}</select>${slot==='s1'&&(itemById(state,id)||{}).cat==='snack'?`<select class="eat-fruit searchable" aria-label="ผลไม้ที่กิน">${fruitOptions(itemById(state,id),P.ch.fruit)}</select>`:''}</div>
       <div class="eat-side">${xsel('eat-x',`data-slot="${slot}"`,x)}<span class="num small ${e?'':'muted'}">${fmt(m.k*(e?e.x:x))} kcal</span></div></div>`;
   };
   const drs=P.ch.drinks.map(id=>itemById(state,id)).filter(Boolean);
@@ -2294,12 +2457,314 @@ function parseCSV(text){
     out.push({d:ymd(dt),type:guessType(iA>=0?c[iA]:''),min:min||30,kcal:iK>=0&&c[iK]?Number(String(c[iK]).replace(/,/g,'')):null});}
   return out;
 }
-async function importFiles(files){
-  let n=0;
-  for(const f of files){const t=await f.text();const rows=/\.tcx$|\.xml$/i.test(f.name)?parseTCX(t):parseCSV(t);
-    for(const r of rows){const list=(state.ex[r.d]=state.ex[r.d]||[]);if(list.some(e=>e.src==='ไฟล์'&&e.min===r.min&&e.type===r.type))continue;list.push({type:r.type,min:r.min,kcal:r.kcal,src:'ไฟล์'});n++;}}
-  commit(); const out=$('#import-out'); if(out) out.textContent=n?`นำเข้า ${n} กิจกรรม ดูได้ที่หน้าตารางเวร`:'ไม่พบกิจกรรมในไฟล์ ตรวจว่าเป็น .tcx หรือ .csv ที่มีคอลัมน์วันที่';
+// ================= watches and health apps =================
+// Garmin (Personal API) and Strava go through the Cloudflare Worker in worker/ai-proxy.js; Zepp comes from its export files.
+// Keys and tokens stay in this browser only (not synced); the data they bring (activities, sleep, daily kcal) is synced.
+const WKEY='nwp-watch';
+function watchCfg(){ try{return JSON.parse(localStorage.getItem(WKEY)||'{}');}catch(e){return {};} }
+function saveWatchCfg(c){ try{localStorage.setItem(WKEY,JSON.stringify(c));}catch(e){} }
+function helperUrl(){ const c=watchCfg(); return String(c.worker||aiSettings().proxy||'').trim().replace(/\/$/,''); }
+function helperToken(){ const c=watchCfg(); return c.worker?(c.token||''):(c.token||aiSettings().proxyToken||''); }
+let watchMsg={garmin:'',strava:'',zepp:''}, watchBusy={garmin:false,strava:false};
+async function helperFetch(path,opt={}){
+  const base=helperUrl(); if(!base) throw {code:'no_helper'};
+  const headers=Object.assign({},opt.headers||{}); const tk=helperToken(); if(tk) headers['x-app-token']=tk;
+  try{ return await fetch(base+path,Object.assign({},opt,{headers})); }
+  catch(e){ throw {code:'network',message:'ต่อ Worker ไม่ได้ ตรวจที่อยู่ Worker, ALLOWED_ORIGIN และอินเทอร์เน็ต'}; }
 }
+async function helperJson(res){
+  if(res.headers.get('x-helper-error')){ const t=await res.text(); throw {code:res.status===401?'helper_token':'helper_cfg',message:t}; }
+  if(res.status===429) throw {code:'rate'};
+  if(res.status===401||res.status===403) throw {code:'auth'};
+  if(!res.ok) throw {code:'http',message:'HTTP '+res.status};
+  const t=await res.text(); return t?JSON.parse(t):null;
+}
+function watchErr(e){
+  const c=e&&e.code;
+  return c==='no_helper'?'ยังไม่ได้ใส่ที่อยู่ Worker (ดู README ข้อ 9)':c==='network'?e.message:c==='helper_token'?'Worker ปฏิเสธ: Proxy token ไม่ตรงกับ APP_TOKEN'
+    :c==='helper_cfg'?'Worker: '+(e.message||'ยังตั้งค่าไม่ครบ'):c==='auth'?(e.message||'สิทธิ์หมดอายุ เชื่อมใหม่อีกครั้ง'):c==='rate'?'เรียกข้อมูลถี่เกินไป รอ 15 นาทีแล้วลองใหม่':(e&&e.message)||'ไม่สำเร็จ';
+}
+function watchDay(date){ const W=(state.watch=state.watch||{}); return W[date]=W[date]||{}; }
+function minOfDay(d){ return d.getHours()*60+d.getMinutes(); }
+function exTypeOf(s){ s=String(s||'').replace(/_/g,' '); if(/ride|cycl|bik|spin/i.test(s)) return 'bike'; if(/strength|weight|hiit|crossfit/i.test(s)) return 'db'; return guessType(s); }
+function addWatchEx(date,e){
+  const list=(state.ex[date]=state.ex[date]||[]);
+  if(e.xid&&list.some(x=>x.xid===e.xid)) return false;
+  // the same workout often reaches two apps (watch -> Strava): keep the first one
+  if(e.t!=null&&list.some(x=>x.t!=null&&x.src!==e.src&&Math.abs(x.t-e.t)<=10&&Math.abs((x.min||0)-(e.min||0))<=Math.max(5,(e.min||0)*0.2))) return false;
+  list.push(e); return true;
+}
+// generic readers: Garmin field names vary by endpoint, so collect every number per calendar date
+function flatNums(o,pre,acc){ acc=acc||{}; pre=pre||''; for(const k in o){ const v=o[k]; if(typeof v==='number') acc[(pre+k).toLowerCase()]=v; else if(v&&typeof v==='object'&&!Array.isArray(v)) flatNums(v,pre+k+'.',acc); } return acc; }
+function byDate(j){
+  const out={};
+  const walk=o=>{ if(Array.isArray(o)){ o.forEach(walk); return; } if(!o||typeof o!=='object') return;
+    const d=o.calendarDate||o.summaryDate||o.date||(o.dailySleepDTO&&o.dailySleepDTO.calendarDate);
+    if(typeof d==='string'&&/^\d{4}-\d{2}-\d{2}/.test(d)){ const k=d.slice(0,10); out[k]=Object.assign(out[k]||{},flatNums(o)); return; }
+    for(const k in o) if(o[k]&&typeof o[k]==='object') walk(o[k]); };
+  walk(j); return out;
+}
+function pickN(f,names){
+  for(const n of names) if(typeof f[n]==='number'&&f[n]>0) return f[n];
+  for(const n of names){ const hit=Object.keys(f).find(k=>k.endsWith('.'+n)); if(hit&&f[hit]>0) return f[hit]; }
+  return null;
+}
+function garminDayFrom(f){
+  let total=pickN(f,['totalkilocalories','calories.total','calories.totalkilocalories','totalcalories']);
+  let active=pickN(f,['activekilocalories','calories.active','calories.activekilocalories','activecalories']);
+  const bm=pickN(f,['bmrkilocalories','calories.bmr','calories.resting','calories.bmrkilocalories','restingcalories','bmrcalories']);
+  if(!total&&active&&bm) total=active+bm;
+  if(!total&&typeof f.calories==='number'&&f.calories>0){ const B=bm||bmr(state.profile,currentWeight(state)); if(f.calories>B*0.8) total=f.calories; else { active=active||f.calories; total=B+f.calories; } }
+  const steps=pickN(f,['totalsteps','steps.total','steps']);
+  return total?{total:Math.round(total),active:active?Math.round(active):null,bmr:bm?Math.round(bm):null,steps:steps?Math.round(steps):null}:null;
+}
+function sleepFrom(f){
+  const s=pickN(f,['sleeptimeseconds','totalsleepseconds','sleepduration','durationinseconds']); if(!s) return null;
+  const toMin=v=>Math.round(v>172800?v/60000:v/60);
+  const part=n=>{ const v=pickN(f,[n]); return v?toMin(v):null; };
+  const score=pickN(f,['sleepscores.overall.value','overallsleepscore','sleepscore']);
+  return {min:toMin(s),deep:part('deepsleepseconds'),light:part('lightsleepseconds'),rem:part('remsleepseconds'),awake:part('awakesleepseconds'),score:score?Math.round(score):null};
+}
+// ---- Garmin ----
+async function garminToken(force){
+  const c=watchCfg(); if(!c.gkey) throw {code:'auth',message:'ยังไม่ได้ใส่ Garmin Personal API key'};
+  if(!force&&c.gtok&&c.gtok.exp>Date.now()+5*60000) return c.gtok.t;
+  const res=await helperFetch('/garmin/token',{method:'POST',headers:{'x-garmin-key':c.gkey}});
+  if(res.headers.get('x-helper-error')) await helperJson(res);
+  if(res.status===401||res.status===403) throw {code:'auth',message:'Garmin API key ไม่ถูกต้องหรือหมดอายุ สร้างใหม่ที่ Garmin Connect → ตั้งค่า → Personal API Key'};
+  if(!res.ok) throw {code:'http',message:'Garmin HTTP '+res.status};
+  let t=(await res.text()).trim();
+  if(t.startsWith('{')){ try{ const j=JSON.parse(t); t=j.access_token||j.accessToken||j.token||''; }catch(e){} }
+  if(!t) throw {code:'http',message:'Garmin ไม่ส่ง token กลับมา'};
+  let exp=Date.now()+23*3600e3;
+  try{ const p=JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))); if(p.exp) exp=Math.min(exp,p.exp*1000); }catch(e){}
+  c.gtok={t,exp}; saveWatchCfg(c); return t;
+}
+async function garminGet(path){
+  let tok=await garminToken(false);
+  let res=await helperFetch('/garmin/api'+path,{headers:{authorization:'Bearer '+tok}});
+  if(res.status===401&&!res.headers.get('x-helper-error')){ tok=await garminToken(true); res=await helperFetch('/garmin/api'+path,{headers:{authorization:'Bearer '+tok}}); }
+  return helperJson(res);
+}
+async function syncGarmin(days,quiet){
+  if(watchBusy.garmin) return; watchBusy.garmin=true;
+  if(!quiet){ watchMsg.garmin='กำลังดึงข้อมูล Garmin…'; render(); }
+  const end=TODAY, start=addDays(TODAY,-(days-1)); let nd=0,ns=0,na=0; const errs=[];
+  const fatal=e=>['auth','no_helper','helper_token','helper_cfg','network'].includes(e&&e.code);
+  try{
+    try{ const D=byDate(await garminGet(`/usersummary-service/v2/dailysummaries?startDate=${start}&endDate=${end}`));
+      for(const d in D){ const g=garminDayFrom(D[d]); if(g){ watchDay(d).garmin=Object.assign(g,{at:Date.now()}); nd++; } } }
+    catch(e){ if(fatal(e)) throw e; errs.push('พลังงานรายวัน: '+watchErr(e)); }
+    try{ for(let s=start; s<=end; s=addDays(s,28)){ const e2=addDays(s,27)<end?addDays(s,27):end;
+        const D=byDate(await garminGet(`/sleep-service/sleep/dailySleepSummariesByDate?startDate=${s}&endDate=${e2}`));
+        for(const d in D){ const sl=sleepFrom(D[d]); if(sl){ (state.sleep=state.sleep||{})[d]=Object.assign(sl,{src:'Garmin'}); ns++; } } } }
+    catch(e){ if(fatal(e)) throw e; errs.push('การนอน: '+watchErr(e)); }
+    try{ const j=await garminGet(`/activitylist-service/activities/search/activities?start=0&limit=100&startDate=${start}&endDate=${end}`);
+      const list=Array.isArray(j)?j:(j&&(j.activities||j.activityList||j.data))||[];
+      for(const a of list){ const st=String(a.startTimeLocal||a.startTimeGMT||a.startTime||''); const dt=new Date(st.replace(' ','T')); if(isNaN(dt)) continue;
+        const min=Math.round((Number(a.duration||a.movingDuration||a.elapsedDuration)||0)/60); if(!min) continue;
+        const kcal=Number(a.calories||a.activeCalories)||null;
+        if(addWatchEx(ymd(dt),{type:exTypeOf((a.activityType&&a.activityType.typeKey)||a.activityName),min,kcal:kcal?Math.round(kcal):null,src:'Garmin',xid:'gm_'+(a.activityId||st),t:minOfDay(dt),name:String(a.activityName||'').slice(0,40)})) na++; } }
+    catch(e){ if(fatal(e)) throw e; errs.push('กิจกรรม: '+watchErr(e)); }
+    const c=watchCfg(); c.glast=Date.now(); saveWatchCfg(c);
+    watchMsg.garmin=`ดึงแล้ว: พลังงาน ${nd} วัน · การนอน ${ns} คืน · กิจกรรมใหม่ ${na} รายการ`+(errs.length?' · ไม่สำเร็จบางส่วน: '+errs.join(' / '):'')+(!nd&&!ns&&!errs.length?' (ไม่พบข้อมูลในช่วงนี้ ตรวจว่านาฬิกาซิงก์กับ Garmin Connect แล้ว)':'');
+    watchBusy.garmin=false; commit(); return;
+  }catch(e){ watchMsg.garmin=watchErr(e); }
+  watchBusy.garmin=false; render();
+}
+// ---- Strava ----
+async function stravaConnect(){
+  try{
+    const j=await helperJson(await helperFetch('/strava/client'));
+    if(!j||!j.client_id) throw {code:'helper_cfg',message:'ยังไม่ได้ใส่ STRAVA_CLIENT_ID และ STRAVA_CLIENT_SECRET'};
+    location.href='https://www.strava.com/oauth/authorize?'+new URLSearchParams({client_id:j.client_id,redirect_uri:location.origin+location.pathname,response_type:'code',approval_prompt:'auto',scope:'read,activity:read_all',state:'strava'});
+  }catch(e){ watchMsg.strava=watchErr(e); render(); }
+}
+function stravaSave(j){ const c=watchCfg(); c.strava=Object.assign(c.strava||{},{access:j.access_token,refresh:j.refresh_token||(c.strava||{}).refresh,exp:(j.expires_at||0)*1000}); if(j.athlete) c.strava.name=[j.athlete.firstname,j.athlete.lastname].filter(Boolean).join(' '); saveWatchCfg(c); }
+async function stravaHandleRedirect(){
+  const q=new URLSearchParams(location.search); if(q.get('state')!=='strava') return;
+  const code=q.get('code');
+  history.replaceState(null,'',location.pathname+'#profile'); render();
+  if(q.get('error')||!code){ watchMsg.strava='ยกเลิกการเชื่อม Strava'; render(); return; }
+  if(!/activity:read/.test(q.get('scope')||'')){ watchMsg.strava='ต้องติ๊กอนุญาตให้อ่านกิจกรรม (View data about your activities) ลองเชื่อมใหม่'; render(); return; }
+  try{ const j=await helperJson(await helperFetch('/strava/token',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({code})}));
+    stravaSave(j); watchMsg.strava='เชื่อม Strava แล้ว'; render(); syncStrava(30); }
+  catch(e){ watchMsg.strava=watchErr(e); render(); }
+}
+async function stravaToken(){
+  const s=watchCfg().strava; if(!s||!s.refresh) throw {code:'auth',message:'ยังไม่ได้เชื่อม Strava'};
+  if(s.access&&s.exp>Date.now()+120000) return s.access;
+  const j=await helperJson(await helperFetch('/strava/token',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({refresh_token:s.refresh})}));
+  stravaSave(j); return j.access_token;
+}
+async function stravaGet(path){ const tok=await stravaToken(); return helperJson(await helperFetch('/strava/api'+path,{headers:{authorization:'Bearer '+tok}})); }
+async function syncStrava(days,quiet){
+  if(watchBusy.strava) return; watchBusy.strava=true;
+  if(!quiet){ watchMsg.strava='กำลังดึงข้อมูล Strava…'; render(); }
+  try{
+    const after=Math.floor(parseYmd(addDays(TODAY,-(days-1))).getTime()/1000);
+    const list=await stravaGet(`/athlete/activities?after=${after}&per_page=100`)||[];
+    let n=0,det=0;
+    for(const a of list){
+      const dt=new Date(String(a.start_date_local||'').replace('Z','')); if(isNaN(dt)) continue;
+      const d=ymd(dt), xid='st_'+a.id; if((state.ex[d]||[]).some(x=>x.xid===xid)) continue;
+      let kcal=Number(a.calories)||null;
+      if(!kcal&&det<20){ try{ const full=await stravaGet('/activities/'+a.id); det++; kcal=Number(full&&full.calories)||null; }catch(e){} }
+      if(!kcal&&a.kilojoules) kcal=Number(a.kilojoules); // cycling: kJ of work ≈ kcal burned
+      if(addWatchEx(d,{type:exTypeOf(a.sport_type||a.type),min:Math.round((a.moving_time||a.elapsed_time||0)/60)||1,kcal:kcal?Math.round(kcal):null,src:'Strava',xid,t:minOfDay(dt),name:String(a.name||'').slice(0,40)})) n++;
+    }
+    const c=watchCfg(); c.slast=Date.now(); saveWatchCfg(c);
+    watchMsg.strava=`ดึงแล้ว: กิจกรรมใหม่ ${n} รายการ (${days} วันล่าสุด)`;
+    watchBusy.strava=false; commit(); return;
+  }catch(e){ watchMsg.strava=watchErr(e); }
+  watchBusy.strava=false; render();
+}
+function autoSyncWatch(){
+  const c=watchCfg(), H=3*3600e3; if(!helperUrl()) return;
+  if(c.gkey&&(!c.glast||Date.now()-c.glast>H)) syncGarmin(3,true);
+  if(c.strava&&c.strava.refresh&&(!c.slast||Date.now()-c.slast>H)) syncStrava(7,true);
+}
+// ---- Zepp / Amazfit export files (also a plain zip) ----
+async function unzipCsv(file){
+  const buf=new Uint8Array(await file.arrayBuffer()), dv=new DataView(buf.buffer);
+  let eo=-1; for(let i=buf.length-22;i>=Math.max(0,buf.length-65557);i--){ if(dv.getUint32(i,true)===0x06054b50){ eo=i; break; } }
+  if(eo<0) throw {message:'ไฟล์ zip เสียหรือไม่ใช่ zip'};
+  const cnt=dv.getUint16(eo+10,true); let p=dv.getUint32(eo+16,true); const out=[];
+  for(let i=0;i<cnt;i++){
+    if(dv.getUint32(p,true)!==0x02014b50) break;
+    const flag=dv.getUint16(p+8,true), method=dv.getUint16(p+10,true), csize=dv.getUint32(p+20,true), nlen=dv.getUint16(p+28,true), xlen=dv.getUint16(p+30,true), clen=dv.getUint16(p+32,true), lho=dv.getUint32(p+42,true);
+    const name=new TextDecoder().decode(buf.subarray(p+46,p+46+nlen)); p+=46+nlen+xlen+clen;
+    if(!/\.csv$/i.test(name)) continue;
+    if(flag&1) throw {code:'encrypted'};
+    const ln=dv.getUint16(lho+26,true), lx=dv.getUint16(lho+28,true), data=buf.subarray(lho+30+ln+lx,lho+30+ln+lx+csize);
+    let text;
+    if(method===0) text=new TextDecoder().decode(data);
+    else if(method===8){ if(typeof DecompressionStream==='undefined') throw {message:'เบราว์เซอร์นี้แตก zip ไม่ได้ ให้แตกไฟล์ก่อนแล้วเลือกไฟล์ .csv'}; text=await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text(); }
+    else continue;
+    out.push({name,text});
+  }
+  return out;
+}
+const ZEPP_SPORT={1:'run',6:'walk',7:'run',8:'run',9:'bike',10:'bike',14:'swim',15:'swim',16:'walk',17:'walk'};
+function csvTable(text){
+  const lines=text.replace(/^﻿/,'').split(/\r?\n/).filter(l=>l.trim()); if(lines.length<2) return null;
+  return {H:splitCSV(lines[0]).map(h=>h.toLowerCase().replace(/\(.*?\)|\/.*$|\s/g,'')),rows:lines.slice(1).map(splitCSV)};
+}
+function zeppImport(text,stats){
+  const T=csvTable(text); if(!T) return false;
+  const ix=n=>T.H.indexOf(n), col=(r,n)=>{ const i=ix(n); return i<0?'':r[i]; }, okD=d=>/^\d{4}-\d{2}-\d{2}$/.test(d);
+  if(ix('deepsleeptime')>=0){
+    for(const r of T.rows){ const d=String(col(r,'date')).slice(0,10); if(!okD(d)) continue;
+      const deep=+col(r,'deepsleeptime')||0, light=+col(r,'shallowsleeptime')||0, rem=+col(r,'remtime')||0, wake=+col(r,'waketime')||0, min=deep+light+rem;
+      if(min>0){ (state.sleep=state.sleep||{})[d]={min,deep,light,rem:rem||null,awake:wake||null,score:null,src:'Zepp'}; stats.s++; } }
+    return true;
+  }
+  if(ix('starttime')>=0&&ix('sporttime')>=0){
+    for(const r of T.rows){ const st=String(col(r,'starttime')).trim();
+      const dt=new Date(/^\d+$/.test(st)?Number(st)*(st.length<=10?1000:1):st.replace(' ','T').replace(/([+-]\d{2})(\d{2})$/,'$1:$2'));
+      if(isNaN(dt)) continue; const min=Math.round((+col(r,'sporttime')||0)/60); if(!min) continue; const kc=+col(r,'calories')||null;
+      if(addWatchEx(ymd(dt),{type:ZEPP_SPORT[+col(r,'type')]||'walk',min,kcal:kc?Math.round(kc):null,src:'Zepp',xid:'zp_'+dt.getTime(),t:minOfDay(dt)})) stats.a++; }
+    return true;
+  }
+  if(ix('date')>=0&&ix('steps')>=0&&ix('calories')>=0){
+    for(const r of T.rows){ const d=String(col(r,'date')).slice(0,10); if(!okD(d)) continue; const kc=+col(r,'calories')||0, steps=+col(r,'steps')||0;
+      if(kc||steps){ watchDay(d).zepp={active:Math.round(kc),steps:Math.round(steps),at:Date.now()}; stats.d++; } }
+    return true;
+  }
+  return false;
+}
+async function importFiles(files){
+  const st={a:0,s:0,d:0,g:0}, errs=[];
+  const pushGeneric=r=>{ const list=(state.ex[r.d]=state.ex[r.d]||[]); if(list.some(e=>e.src==='ไฟล์'&&e.min===r.min&&e.type===r.type)) return; list.push({type:r.type,min:r.min,kcal:r.kcal,src:'ไฟล์'}); st.g++; };
+  const csv=text=>{ if(!zeppImport(text,st)) parseCSV(text).forEach(pushGeneric); };
+  for(const f of files){
+    try{
+      if(/\.zip$/i.test(f.name)){ const list=await unzipCsv(f); if(!list.length) throw {message:'ไม่พบไฟล์ .csv ใน zip'}; list.forEach(e=>csv(e.text)); }
+      else { const t=await f.text(); if(/\.tcx$|\.xml$/i.test(f.name)) parseTCX(t).forEach(pushGeneric); else csv(t); }
+    }catch(e){ errs.push(f.name+': '+(e&&e.code==='encrypted'?'zip มีรหัสผ่าน ให้แตกไฟล์ด้วยรหัสที่แอป Zepp ให้มาก่อน แล้วเลือกไฟล์ .csv ข้างใน':(e&&e.message)||'อ่านไม่ได้')); }
+  }
+  const parts=[st.d&&`พลังงาน/ก้าว ${st.d} วัน`,st.s&&`การนอน ${st.s} คืน`,(st.a+st.g)&&`กิจกรรม ${st.a+st.g} รายการ`].filter(Boolean);
+  watchMsg.zepp=(parts.length?'นำเข้าแล้ว: '+parts.join(' · '):'ไม่พบข้อมูลที่อ่านได้ในไฟล์')+(errs.length?' · '+errs.join(' / '):'');
+  commit(); const out=$('#import-out'); if(out) out.textContent=watchMsg.zepp;
+}
+// ---- energy used minus energy eaten ----
+function energyUsed(date){
+  const w=(state.watch||{})[date]||{}, E=dayEnergy(state,date), part=date===TODAY;
+  const est=Math.round(E.tdee);
+  let k=null, src='';
+  if(w.garmin&&w.garmin.total){ k=w.garmin.total; src='Garmin'; }
+  else if(w.zepp&&w.zepp.active!=null){ k=Math.round(bmr(state.profile,E.w))+w.zepp.active; src='Zepp'; }
+  if(k==null) return {k:est,src:'ประมาณจากเวร',est:true};
+  // today is not over: the watch only counts what has been burned so far, so compare the full-day estimate with the food
+  if(part&&k<est) return {k:est,src:`คาดทั้งวัน · ${src} ถึงตอนนี้ ${fmt(k)}`,est:true};
+  return {k,src,partial:part};
+}
+function balanceDay(date){
+  const u=energyUsed(date), {t,n}=eatenTotal(date), w=(state.watch||{})[date]||{};
+  return {date,used:u,eaten:n?Math.round(t.k):null,bal:n?u.k-Math.round(t.k):null,sleep:(state.sleep||{})[date]||null,steps:(w.garmin||w.zepp||{}).steps||null};
+}
+function balTxt(b){ return b==null?'<span class="muted">ยังไม่บันทึกการกิน</span>':`<b class="num ${b>=0?'ok':'badc'}">${b>=0?'':'−'}${fmt(Math.abs(b))} kcal</b> <span class="small muted">${b>=0?'(ใช้มากกว่ากิน)':'(กินมากกว่าใช้)'}</span>`; }
+function sleepTxt(s){ if(!s) return ''; const parts=[s.deep&&`หลับลึก ${durTxt(s.deep)}`,s.rem&&`REM ${durTxt(s.rem)}`].filter(Boolean); return `${durTxt(s.min)}${parts.length?` (${parts.join(' · ')})`:''}${s.score?` · คะแนน ${s.score}`:''}`; }
+function balanceCard(){
+  const b=balanceDay(TODAY), y=balanceDay(addDays(TODAY,-1));
+  const row=(x,label)=>`<tr><td>${label}</td><td class="r num">${fmt(x.used.k)}${x.used.partial?'<div class="small muted">ถึงตอนนี้</div>':''}<div class="small muted">${esc(x.used.src)}</div></td><td class="r num">${x.eaten!=null?fmt(x.eaten):'–'}</td><td class="r">${balTxt(x.bal)}</td></tr>`;
+  return `<section class="card" style="margin-top:12px">
+    <div class="spread"><h2>พลังงานที่ใช้ − พลังงานที่กิน</h2><a href="#progress" class="small">ดูทั้งสัปดาห์</a></div>
+    <div class="tablewrap"><table><thead><tr><th>วัน</th><th class="r">ใช้ไป (kcal)</th><th class="r">กิน (kcal)</th><th class="r">ใช้ − กิน</th></tr></thead><tbody>${row(b,'วันนี้')}${row(y,'เมื่อวาน')}</tbody></table></div>
+    ${b.sleep?`<p class="small">นอนเมื่อคืน: <b>${sleepTxt(b.sleep)}</b> <span class="muted">(${esc(b.sleep.src)})</span>${b.sleep.min<360?' · <span style="color:var(--warn)">นอนน้อยกว่า 6 ชม. มักหิวง่ายขึ้น เลือกอาหารว่างโปรตีนสูงไว้ก่อน</span>':''}</p>`:''}
+    <p class="small muted">${b.used.src==='ประมาณจากเวร'?'ยังไม่มีข้อมูลจากนาฬิกา พลังงานที่ใช้เป็นค่าประมาณจากเวรและการออกกำลัง เชื่อมนาฬิกาได้ที่หน้าตั้งค่า':b.used.est?'วันนี้ยังไม่จบ จึงใช้ค่าคาดการณ์ทั้งวัน พรุ่งนี้จะเป็นค่าจริงจากนาฬิกา':'พลังงานที่ใช้มาจากนาฬิกา'} · ใช้มากกว่ากินรวมราว 7,700 kcal ≈ ไขมัน 1 กก.</p>
+  </section>`;
+}
+let balWeek=mondayOf(TODAY);
+function balanceWeekCard(){
+  const days=[...Array(7)].map((_,i)=>addDays(balWeek,i));
+  const R=days.map(d=>d<=TODAY?balanceDay(d):null);
+  const withEat=R.filter(r=>r&&r.bal!=null), sum=withEat.reduce((s,r)=>s+r.bal,0);
+  const sl=R.filter(r=>r&&r.sleep), avgSl=sl.length?sl.reduce((s,r)=>s+r.sleep.min,0)/sl.length:0;
+  return `<section class="card" style="margin-top:12px">
+    <div class="spread"><h2>สมดุลพลังงานและการนอน</h2>
+      <div class="row"><button id="bal-prev" aria-label="สัปดาห์ก่อน">‹</button><span class="small">${thDate(days[0],false)} – ${thDate(days[6],false)}</span><button id="bal-next" aria-label="สัปดาห์ถัดไป">›</button></div></div>
+    <div class="tablewrap"><table><thead><tr><th>วัน</th><th class="r">ใช้ไป</th><th class="r">กิน</th><th class="r">ใช้ − กิน</th><th>นอน</th></tr></thead><tbody>
+    ${days.map((d,i)=>{const r=R[i]; if(!r) return `<tr><td>${thDate(d)} ${chip(state.shifts[d]||'OFF')}</td><td colspan="4" class="small muted">–</td></tr>`;
+      return `<tr><td>${thDate(d)} ${chip(state.shifts[d]||'OFF')}</td><td class="r num">${fmt(r.used.k)}<div class="small muted">${esc(r.used.src)}${r.used.partial?' · ถึงตอนนี้':''}</div></td><td class="r num">${r.eaten!=null?fmt(r.eaten):'–'}</td><td class="r">${r.bal==null?'<span class="small muted">ไม่ได้บันทึก</span>':`<b class="num ${r.bal>=0?'ok':'badc'}">${r.bal>=0?'':'−'}${fmt(Math.abs(r.bal))}</b>`}</td><td class="small">${r.sleep?durTxt(r.sleep.min)+(r.sleep.score?` · ${r.sleep.score}`:''):'–'}</td></tr>`;}).join('')}
+    </tbody></table></div>
+    <p class="small">${withEat.length?`รวม ${withEat.length} วันที่บันทึกการกิน: ใช้ − กิน = ${balTxt(sum)} · เฉลี่ย ${fmt(sum/withEat.length)} kcal/วัน · เทียบเท่าไขมันราว <b class="num">${(sum/7700).toFixed(2)} กก.</b>`:'สัปดาห์นี้ยังไม่ได้บันทึกการกิน บันทึกได้ที่หน้าวันนี้'}${avgSl?` · นอนเฉลี่ย ${durTxt(avgSl)}/คืน`:''}</p>
+    <p class="small muted">นาฬิกาประมาณพลังงานคลาดได้ราว ±10–20% ดูแนวโน้มน้ำหนักเฉลี่ยรายสัปดาห์ประกอบด้วย</p>
+  </section>`;
+}
+function watchCard(){
+  const c=watchCfg(), W=helperUrl();
+  const ago=t=>t?'ดึงล่าสุด '+new Date(t).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'}):'ยังไม่เคยดึง';
+  return `<section class="card" style="margin-top:12px" id="watch-card">
+    <h2>เชื่อมนาฬิกาและแอปสุขภาพ</h2>
+    <p class="small muted">ดึงการนอน การออกกำลังกาย และพลังงานที่ใช้ทั้งวัน มาคำนวณ "พลังงานที่ใช้ − พลังงานที่กิน" ที่หน้าวันนี้และหน้าติดตาม Garmin และ Strava ดึงใหม่ให้เองเมื่อเปิดแอป (ทุก 3 ชั่วโมง) คีย์เก็บในเครื่องนี้เท่านั้น ไม่ซิงก์ขึ้นบัญชี</p>
+    <details ${W?'':'open'}><summary>ตัวกลาง Cloudflare Worker (จำเป็นสำหรับ Garmin และ Strava)${W?' · ตั้งแล้ว':''}</summary>
+      <div class="grid cols-2" style="margin-top:8px"><label class="f">ที่อยู่ Worker<input id="wk-url" value="${esc(c.worker||'')}" placeholder="${esc(aiSettings().proxy||'https://ชื่อ.ชื่อบัญชี.workers.dev')}"></label>
+      <label class="f">Proxy token (APP_TOKEN)<input id="wk-token" type="password" autocomplete="off" value="${esc(c.token||'')}"></label></div>
+      <p class="small muted">วิธีสร้างอยู่ใน README ข้อ 9 (ฟรี ใช้ตัวเดียวกับ AI ได้) ถ้าเว้นว่างจะใช้ Worker ที่ตั้งไว้ในตั้งค่า AI</p></details>
+    <div class="grid cols-3">
+      <div class="howto"><b>Garmin</b><span class="small muted">พลังงานทั้งวัน การนอน ก้าวเดิน กิจกรรม</span>
+        <label class="f">Personal API key<input id="gm-key" type="password" autocomplete="off" value="${c.gkey?'••••••••':''}" placeholder="วางคีย์จาก Garmin Connect"></label>
+        <div class="row"><button class="primary" id="gm-sync" ${watchBusy.garmin?'disabled':''}>${watchBusy.garmin?'กำลังดึง…':'ดึงข้อมูล 30 วัน'}</button>${c.gkey?'<button class="ghost small" id="gm-forget">ลบคีย์</button>':''}</div>
+        <span class="small muted">${c.gkey?ago(c.glast):'สร้างคีย์ที่ connect.garmin.com → ตั้งค่า → Personal API Key (เลือกอายุ 1 ปี)'}</span>
+        ${watchMsg.garmin?`<p class="small">${esc(watchMsg.garmin)}</p>`:''}</div>
+      <div class="howto"><b>Strava</b><span class="small muted">กิจกรรมและพลังงานต่อกิจกรรม (Strava ไม่มีข้อมูลการนอน)</span>
+        ${c.strava&&c.strava.refresh?`<span class="small">เชื่อมแล้ว${c.strava.name?' · '+esc(c.strava.name):''}</span>
+          <div class="row"><button class="primary" id="st-sync" ${watchBusy.strava?'disabled':''}>${watchBusy.strava?'กำลังดึง…':'ดึงกิจกรรม 30 วัน'}</button><button class="ghost small" id="st-forget">ยกเลิกการเชื่อม</button></div>
+          <span class="small muted">${ago(c.slast)}</span>`:`<button class="primary" id="st-connect">เชื่อมต่อ Strava</button>`}
+        ${watchMsg.strava?`<p class="small">${esc(watchMsg.strava)}</p>`:''}</div>
+      <div class="howto"><b>Zepp / Amazfit</b><span class="small muted">นำเข้าไฟล์ที่ส่งออกจากแอป Zepp: การนอน ก้าว พลังงาน กิจกรรม</span>
+        <input type="file" id="zepp-in" accept=".zip,.csv" multiple aria-label="ไฟล์ที่ส่งออกจาก Zepp">
+        <details class="small"><summary>วิธีส่งออกข้อมูลจาก Zepp</summary><ol style="padding-left:18px;margin:6px 0">
+          <li>แอป Zepp → โปรไฟล์ → ตั้งค่า → หาเมนู "ส่งออกข้อมูล" (Export data) ชื่อเมนูต่างกันเล็กน้อยตามรุ่นแอป</li>
+          <li>เลือกช่วงวันที่และชนิดข้อมูล แล้วรอลิงก์ดาวน์โหลด ไฟล์ .zip มักมีรหัสผ่านที่แอปแสดงให้</li>
+          <li>แตกไฟล์ด้วยรหัสนั้น แล้วเลือกไฟล์ .csv ทั้งหมดที่นี่ (ACTIVITY, SLEEP, SPORT) ถ้า zip ไม่มีรหัส เลือกไฟล์ .zip ได้เลย</li></ol></details>
+        ${watchMsg.zepp?`<p class="small">${esc(watchMsg.zepp)}</p>`:''}</div>
+    </div>
+    <p class="small muted">Apple Health และ Google Health Connect ดึงจากเว็บแอปไม่ได้ ถ้านาฬิกายี่ห้ออื่นส่งข้อมูลไป Strava ได้ ให้เชื่อมผ่าน Strava</p>
+  </section>`;
+}
+
 
 
 // ================= PWA platform layer =================
@@ -2684,10 +3149,16 @@ document.addEventListener('change',e=>{
   else if(t.id==='rice-sel'){setDay(selDate,{rice:t.value});commit();}
   else if(t.classList.contains('slot-sel')){setDay(selDate,{[t.dataset.slot]:t.value});commit();}
   else if(t.id==='drink-add'){if(t.value){const d=dayChoice(state,selDate);setDay(selDate,{drinks:d.drinks.concat(t.value)});commit();}}
-  else if((t.id==='meat-sel'||t.classList.contains('wk-meat'))&&t.value==='__ai'){const d=t.dataset.date||selDate;meatAi.date=d;if(t.dataset.date)selDate=d;const q=(t.dataset.q||'').trim();if(q)runMeatAi(q);else{meatAi.open=true;render();const el=document.getElementById('meatai');if(el){el.scrollIntoView({behavior:'smooth',block:'center'});const i=document.getElementById('meatai-q');if(i)i.focus();}}}
+  else if((t.id==='meat-sel'||t.classList.contains('wk-meat')||t.id==='fruit-sel')&&t.value==='__ai'){const d=t.dataset.date||selDate;if(t.dataset.date)selDate=d;aiStart(t.id==='fruit-sel'?'fruit':'meat',d,t.dataset.q);}
+  else if(t.classList.contains('eat-fruit')&&t.value==='__ai'){selDate=eatDate;aiStart('fruit',eatDate,t.dataset.q,true);}
+  else if(t.id==='fruit-sel'){setDay(selDate,{fruit:t.value});commit();}
+  else if(t.classList.contains('eat-fruit')){setDay(eatDate,{fruit:t.value});commit();}
+  else if(t.id==='yog-sel'){if(t.value==='__add'){yogAi=Object.assign(yogBlankState(),{open:true});render();const el=document.getElementById('yogai');if(el)el.scrollIntoView({behavior:'smooth',block:'center'});}else{state.profile.yogurt=t.value;commit();toast('ใช้'+(t.value==='greekyog'?'กรีกโยเกิร์ตทั่วไป':' '+((state.customYogurts||{})[t.value]||{}).t)+'แล้ว');}}
+  else if(t.id==='yog-file'){yogReadForm();yogAi.urls.forEach(u=>URL.revokeObjectURL(u));yogAi.files=[...(t.files||[])].slice(0,3);yogAi.urls=yogAi.files.map(f=>URL.createObjectURL(f));yogAi.err='';render();}
+  else if(t.classList.contains('yog-n')||t.id==='yog-name'){yogReadForm();render();}
   else if(t.id==='meat-sel'){setDay(selDate,{meat:t.value});commit();}
   else if(t.classList.contains('wk-meat')){setDay(t.dataset.date,{meat:t.value});commit();}
-  else if(t.classList.contains('mai-n')){if(meatAi.res){const v=Math.max(0,Number(t.value)||0);meatAi.res[t.dataset.f]=t.dataset.f==='price'?Math.round(v):v;meatAiCheck(meatAi.res);const nm=document.getElementById('mai-name');if(nm)meatAi.res.name=nm.value;render();}}
+  else if(t.classList.contains('mai-n')){if(meatAi.res){const v=Math.max(0,Number(t.value)||0);meatAi.res[t.dataset.f]=['price','serving'].includes(t.dataset.f)?Math.round(v):v;const un=document.getElementById('mai-unit');if(un)meatAi.res.unit=un.value;meatAiCheck(meatAi.res);const nm=document.getElementById('mai-name');if(nm)meatAi.res.name=nm.value;render();}}
   else if(t.id==='fp-on'){const f=state.profile.fixedPortion=Object.assign({},state.profile.fixedPortion||{});f.on=t.checked;if(f.on&&!(f.meat>0)){const v=freePortion(state,selDate)||weekFreePortion(state,selDate);if(v){f.meat=v.meat;f.rice=v.rice;}}commit();}
   else if(t.id==='fp-meat'||t.id==='fp-rice'){const v=Number(t.value);if(t.value===''||!(v>=0)){render();return;}const f=state.profile.fixedPortion=Object.assign({on:true},state.profile.fixedPortion||{});f[t.id==='fp-meat'?'meat':'rice']=r5(v);commit();}
   else if(t.classList.contains('eat-sel')){const L=eatGet(eatDate);const s=t.dataset.slot;L[s]={id:t.value,x:L[s]&&L[s].x?L[s].x:1};commit();}
@@ -2701,7 +3172,9 @@ document.addEventListener('change',e=>{
   else if(t.id==='d-pick'){if(t.value){selDate=t.value;render();}}
   else if(t.classList.contains('weigh')){(state.weighed[selDate]=state.weighed[selDate]||{});if(t.value==='')delete state.weighed[selDate][t.dataset.k];else state.weighed[selDate][t.dataset.k]=Number(t.value);commit();}
   else if(t.classList.contains('price-g')||t.classList.contains('price-p')){const k=t.dataset.k;const cur=Object.assign({},ING[k].buy,state.prices[k]||{});const v=Number(t.value);if(!(v>0||(t.classList.contains('price-p')&&v===0)))return;if(t.classList.contains('price-g'))cur.g=v;else cur.price=v;state.prices[k]={g:cur.g,price:cur.price,label:cur.label,src:'u'};commit();}
-  else if(t.id==='file-in'){importFiles([...t.files]);}
+  else if(t.id==='file-in'||t.id==='zepp-in'){importFiles([...t.files]);}
+  else if(t.id==='wk-url'||t.id==='wk-token'){const c=watchCfg();c[t.id==='wk-url'?'worker':'token']=t.value.trim();saveWatchCfg(c);render();}
+  else if(t.id==='gm-key'){const v=t.value.trim();if(v&&!/^•+$/.test(v)){const c=watchCfg();c.gkey=v;delete c.gtok;saveWatchCfg(c);syncGarmin(30);}}
   else if(t.id==='photo-in'){const f=t.files&&t.files[0];if(photo.url)URL.revokeObjectURL(photo.url);photo={file:f||null,url:f?URL.createObjectURL(f):null,busy:false,res:null,err:''};render();}
 });
 document.addEventListener('click',e=>{
@@ -2740,11 +3213,15 @@ document.addEventListener('click',e=>{
   else if(t.id==='copy-week'){for(let i=0;i<7;i++){const s=state.shifts[addDays(rosterWeek,i)];if(s)state.shifts[addDays(rosterWeek,i+7)]=s;}commit();toast('คัดลอกเวรแล้ว');}
   else if(t.id==='d-prev'){selDate=addDays(selDate,-1);render();}
   else if(t.id==='d-next'){selDate=addDays(selDate,1);render();}
-  else if(t.id==='meatai-open'){meatAi.open=true;meatAi.date=selDate;render();const i=document.getElementById('meatai-q');if(i)i.focus();}
-  else if(t.id==='meatai-close'){meatAi={open:false,busy:false,q:'',res:null,err:'',date:null};render();}
+  else if(t.dataset.aiopen){aiStart(t.dataset.aiopen,selDate,'');}
+  else if(t.id==='meatai-close'){aiReset();render();}
   else if(t.id==='meatai-use'){saveMeatAi(true);}
   else if(t.id==='meatai-save'){saveMeatAi(false);}
-  else if(t.dataset.meatdel){const k=t.dataset.meatdel;delete state.customMeats[k];commit();toast('ลบแล้ว วันที่เคยใช้จะกลับไปใช้ตามสูตร');}
+  else if(t.dataset.aidel){const [kind,k]=t.dataset.aidel.split('|');delete (state[AI_KIND[kind].store]||{})[k];commit();toast('ลบแล้ว วันที่เคยใช้จะกลับไปใช้ตามรายการเดิม');}
+  else if(t.id==='yog-go'){runYogAi();}
+  else if(t.id==='yog-save'){saveYog();}
+  else if(t.id==='yog-close'){yogAi.urls.forEach(u=>URL.revokeObjectURL(u));yogAi=yogBlankState();render();}
+  else if(t.dataset.yogdel){const k=t.dataset.yogdel;delete state.customYogurts[k];if(state.profile.yogurt===k)state.profile.yogurt='greekyog';commit();toast('ลบยี่ห้อแล้ว');}
   else if(t.id==='fp-today'){const v=freePortion(state,selDate);if(!v){toast('วันนี้ไม่ได้ทำกล่องเอง ลองเลือกวันอื่น');return;}state.profile.fixedPortion={on:true,meat:v.meat,rice:v.rice};commit();toast(`ทุกวัน: เนื้อสัตว์ ${v.meat} ก. ข้าวสุก ${v.rice} ก.`);}
   else if(t.id==='fp-week'){const v=weekFreePortion(state,selDate);if(!v){toast('สัปดาห์นี้ไม่มีวันที่ทำกล่องเอง');return;}state.profile.fixedPortion={on:true,meat:v.meat,rice:v.rice};commit();toast(`ทุกวัน: เนื้อสัตว์ ${v.meat} ก. ข้าวสุก ${v.rice} ก.`);}
   else if(t.dataset.eat){eatToggle(eatDate,t.dataset.eat);commit();}
@@ -2766,6 +3243,13 @@ document.addEventListener('click',e=>{
   else if(t.id==='shop-uncheck'){if(state.shopChecked)delete state.shopChecked[shopWeek];commit();}
   else if(t.id==='price-reset'){state.prices={};commit();toast('กลับไปใช้ราคาตั้งต้นแล้ว');}
   else if(t.id==='apply-adv'){state.adjust=(state.adjust||0)+Number(t.dataset.v);commit();toast('ปรับพลังงานแล้ว');}
+  else if(t.id==='gm-sync'){const i=$('#gm-key');const v=i?i.value.trim():'';if(v&&!/^•+$/.test(v)){const c=watchCfg();c.gkey=v;delete c.gtok;saveWatchCfg(c);}syncGarmin(30);}
+  else if(t.id==='gm-forget'){const c=watchCfg();delete c.gkey;delete c.gtok;delete c.glast;saveWatchCfg(c);watchMsg.garmin='ลบคีย์ Garmin จากเครื่องนี้แล้ว (ข้อมูลที่ดึงมาแล้วยังอยู่)';render();}
+  else if(t.id==='st-connect'){stravaConnect();}
+  else if(t.id==='st-sync'){syncStrava(30);}
+  else if(t.id==='st-forget'){const c=watchCfg();delete c.strava;delete c.slast;saveWatchCfg(c);watchMsg.strava='ยกเลิกการเชื่อมในแอปแล้ว ถอนสิทธิ์ทั้งหมดได้ที่ strava.com → Settings → My Apps';render();}
+  else if(t.id==='bal-prev'){balWeek=addDays(balWeek,-7);render();}
+  else if(t.id==='bal-next'){balWeek=addDays(balWeek,7);render();}
   else if(t.id==='hr-connect'){if(!hr.connected)connectHR();}
   else if(t.id==='hr-start'){toggleHR();}
   else if(t.id==='exp'){copy(JSON.stringify(state));}
@@ -2785,6 +3269,8 @@ document.addEventListener('pointermove',e=>{
 setInterval(()=>{if(route()==='today'&&ifCfg(state).mode!=='off'&&!document.querySelector('#view :focus'))render();},60000);
 setInterval(()=>{if(hr.running){const el=$('#hr-live');if(el)el.innerHTML=hrLiveText();}},5000);
 render(); initStore();
+stravaHandleRedirect(); setTimeout(autoSyncWatch,3000);
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') autoSyncWatch(); });
 document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('a.cta')){shopWeek=mondayOf(selDate);shopImg=null;}});
 
 </script>
