@@ -192,6 +192,28 @@ details summary{cursor:pointer;color:var(--accent)}
 .ci-cost{color:var(--muted);font-size:13px;min-width:56px;text-align:right}
 .prep{margin:0;padding-left:20px;display:grid;gap:8px}
 .shop-preview{max-width:100%;max-height:520px;border-radius:12px;border:1px solid var(--line);justify-self:start}
+.cb{position:relative;width:100%;min-width:0}
+.cb>select{display:none}
+.cb-in{width:100%;text-overflow:ellipsis}
+.cb.open .cb-in{border-color:var(--accent);background:var(--surface)}
+.cb-list{position:fixed;z-index:45;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.18);padding:4px;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.cb-opt{padding:9px 10px;border-radius:8px;cursor:pointer;font-size:14px;line-height:1.35}
+.cb-opt:hover,.cb-opt.act{background:var(--surface-2)}
+.cb-opt.sel{font-weight:600;color:var(--accent)}
+.cb-g{font-size:12px;color:var(--muted);padding:8px 10px 2px;font-weight:600}
+.cb-empty{padding:10px;color:var(--muted);font-size:13px}
+.wkplan .cb{min-width:190px}
+.wkplan select.wk-meat{display:block;margin-top:4px;width:100%}
+.wkplan .cb+.cb{margin-top:4px}
+.meatai{display:grid;gap:8px}
+.meatai .nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px}
+.meatai .nums input{width:100%}
+.eat-row{display:grid;grid-template-columns:32px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.eat-row:last-of-type{border-bottom:none}
+.eat-main{display:grid;gap:4px;min-width:0}
+.eat-side{display:grid;gap:4px;justify-items:end}
+.eat-side select{min-height:34px;padding:4px 6px;font-size:13px}
+@media (max-width:520px){.eat-row{grid-template-columns:32px minmax(0,1fr)}.eat-side{grid-column:2;display:flex;justify-content:space-between;align-items:center}}
 .howto{display:grid;gap:6px;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
 .steps{margin:0;padding-left:22px;display:grid;gap:6px}
 .steps li::marker{color:var(--accent);font-weight:600}
@@ -287,6 +309,7 @@ const ING = {
   chicken:{t:'อกไก่ไม่มีหนัง', k:120,p:23,c:0,f:2.6, buy:{g:2000,price:235,label:'เอโร่ อกไก่ไม่มีหนังแช่แข็ง 2 กก.',src:'m'}},
   thigh:{t:'สะโพกไก่ลอกหนัง', k:121,p:20,c:0,f:4.1, buy:{g:1000,price:110,label:'สะโพกไก่ลอกหนัง 1 กก.',src:'e'}},
   pork:{t:'หมูสันใน', k:140,p:21,c:0,f:6, buy:{g:1000,price:145,label:'ซีพี สันในหมู 1 กก.',src:'m'}},
+  beef:{t:'เนื้อวัวไม่ติดมัน', k:150,p:22,c:0,f:6.5, buy:{g:1000,price:350,label:'เนื้อวัวสะโพก/สันใน ไม่ติดมัน 1 กก.',src:'e'}},
   fish:{t:'ปลาเนื้อขาว (ปลานิลแล่)', k:96,p:20,c:0,f:1.7, buy:{g:1000,price:147,label:'เอโร่ เนื้อปลานิลแล่แช่แข็ง 1 กก.',src:'m'}},
   shrimp:{t:'กุ้งขาวปอกเปลือก', k:85,p:19,c:0,f:1, buy:{g:1000,price:270,label:'เอโร่ กุ้งขาวปอกเปลือกแช่แข็ง 1 กก.',src:'m'}},
   squid:{t:'หมึก', k:90,p:16,c:3,f:1.4, buy:{g:1000,price:200,label:'หมึกกล้วยแช่แข็ง 1 กก.',src:'e'}},
@@ -450,14 +473,14 @@ const ITEMS = [
  {id:'sh_tomyum', cat:'shop', n:'ข้าวสวย + ต้มยำกุ้งน้ำใส', m:{k:420,p:25,c:62,f:6}, price:70},
  {id:'sh_omelet', cat:'shop', n:'ข้าวไข่เจียว', m:{k:600,p:16,c:60,f:32}, price:35}
 ];
-const ITEM_CATS = {bf:'มื้อแรกทำเอง', snack:'อาหารว่าง', fruit:'ผลไม้', dessert:'ของหวาน', drink:'ชา กาแฟ เครื่องดื่ม', '711':'เซเว่น', shop:'ร้านตามสั่ง', custom:'รายการของฉัน / จากรูปถ่าย'};
+const ITEM_CATS = {bf:'มื้อเบาทำเอง (ไข่ โจ๊ก โอ๊ต)', snack:'อาหารว่าง', fruit:'ผลไม้', dessert:'ของหวาน', drink:'ชา กาแฟ เครื่องดื่ม', '711':'เซเว่น', shop:'ร้านตามสั่ง', custom:'รายการของฉัน / จากรูปถ่าย'};
 const MEAL_TIMES = {
-  OFF:['เช้า: มื้อแรก','กลางวัน: มื้อหลัก 1','บ่าย: ว่าง 1','เย็น: มื้อหลัก 2','(ว่าง 2 ถ้าหิว)'],
-  M:['06:30 มื้อแรกก่อนออกบ้าน','12:00 มื้อหลัก 1 (กล่องที่พกมา)','16:30 ว่าง 1 หลังเลิกเวร','19:00 มื้อหลัก 2 ที่บ้าน','21:00 ว่าง 2 ถ้าหิว'],
-  A:['10:00 มื้อแรกหลังตื่น','14:30 มื้อหลัก 1 ก่อนเข้าเวร','18:00 ว่าง 1','20:30 มื้อหลัก 2 กลางเวร','23:00 ว่าง 2 เบาๆ แล้วไม่กินหนักหลังเลิก'],
-  N:['22:30 (คืนก่อน) มื้อแรกเบาๆ ก่อนออกไปเวรดึก','03:00 มื้อหลัก 1 กลางเวร (ข้าวน้อยลง)','03:00–07:00 เลี่ยงของหวาน เน้นน้ำ','08:30 ว่าง 1 หลังลงเวร แล้วกลับไปนอน','15:00 มื้อหลัก 2 หลังตื่น · 19:00 ว่าง 2'],
-  MA:['06:30 มื้อแรก','12:00 มื้อหลัก 1','16:00 ว่าง 1 ตอนต่อเวร','19:30 มื้อหลัก 2','22:30 ว่าง 2 เบาๆ'],
-  AN:['22:30 (คืนก่อน) มื้อแรกเบาๆ ก่อนเวรดึก','03:00 ว่าง 1 กลางเวรดึก','08:30 มื้อหลัก 1 หลังลงเวร แล้วนอนพัก','15:00 มื้อหลัก 2 ก่อนเข้าเวรบ่าย','20:00 ว่าง 2 กลางเวรบ่าย']
+  OFF:['10:00 มื้อหลัก 1 (มื้อสาย)','15:00 อาหารว่าง','18:30 มื้อหลัก 2 แล้วไม่กินอะไรหนักอีก'],
+  M:['06:30 มื้อหลัก 1 ก่อนออกบ้าน','12:00 อาหารว่างช่วงพัก','17:30 มื้อหลัก 2 หลังเลิกเวร'],
+  A:['11:00 มื้อหลัก 1 หลังตื่น','15:00 อาหารว่างก่อนเข้าเวร','20:00 มื้อหลัก 2 กลางเวร แล้วไม่กินหนักหลังเลิก'],
+  N:['03:00 มื้อหลัก 1 กลางเวร (ข้าวน้อยลง)','03:00–07:00 เลี่ยงของหวาน เน้นน้ำ','08:30 อาหารว่างหลังลงเวร แล้วกลับไปนอน','16:00 มื้อหลัก 2 หลังตื่น'],
+  MA:['06:30 มื้อหลัก 1','15:30 อาหารว่างตอนต่อเวร','19:30 มื้อหลัก 2'],
+  AN:['03:00 อาหารว่างกลางเวรดึก','08:30 มื้อหลัก 1 หลังลงเวร แล้วนอนพัก','15:00 มื้อหลัก 2 ก่อนเข้าเวรบ่าย','กลางเวรบ่าย: น้ำ ชา กาแฟไม่หวาน']
 };
 
 function ymd(d){const z=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate());}
@@ -514,24 +537,25 @@ function dayChoice(st,date){
   return {
     menu,
     rice:d.rice||getMenu(st,menu).rice||st.profile.rice||'brown',
-    bf:d.bf!==undefined?d.bf:'bf_egg',
+    bf:'', s2:'', // first meal and 2nd snack removed: their share goes to the 2 main meals
     m1:d.m1||'home', m2:d.m2||'home',
     s1:d.s1!==undefined?d.s1:SNACK_ROT[dowIdx(date)%3],
-    s2:d.s2!==undefined?d.s2:(w>=80?SNACK_ROT[(dowIdx(date)+1)%3]:''),
+    meat:d.meat&&(MEAT_OPTS[d.meat]||((st.customMeats||{})[d.meat]&&ING[d.meat]))?d.meat:'',
     drinks:d.drinks||['dr_black']
   };
 }
 function riceMacroPerG(rt){ let m={...Z}; for(const [k,sh] of RICE[rt].mix) m=addM(m,ingM(k,1),sh); return m; }
 
-function planDay(st,date){
+function planDay(st,date,opt={}){
   const E=dayEnergy(st,date);
   const ch=dayChoice(st,date);
-  const m=getMenu(st,ch.menu);
+  const m=menuWithMeat(getMenu(st,ch.menu),ch.meat);
+  const fp=opt.free?null:fixedPortion(st);
   const carbMax=healthCarbMax(st); // % of kcal, 0 = no cap
   // fixed parts
   const slots=[];
   const push=(slot,id)=>{ if(!id||id==='home') return; const it=itemById(st,id); if(it) slots.push({slot,it,m:itemM(it)}); };
-  push('bf',ch.bf); push('m1',ch.m1); push('m2',ch.m2); push('s1',ch.s1); push('s2',ch.s2);
+  push('m1',ch.m1); push('m2',ch.m2); push('s1',ch.s1);
   for(const id of ch.drinks) push('drink',id);
   let fixed={...Z}; for(const s of slots) fixed=addM(fixed,s.m);
   const boxes=(ch.m1==='home'?1:0)+(ch.m2==='home'?1:0);
@@ -546,7 +570,13 @@ function planDay(st,date){
     base=addM(base,seasonM(m.s*fr));
     const cmix=(m.carb&&m.carb.length)?m.carb:RICE[ch.rice].mix;
     let rpg={...Z}; for(const [k,sh] of cmix) rpg=addM(rpg,ingM(k,1),sh);
-    for(let i=0;i<5;i++){
+    const ownC=!!(m.carb&&m.carb.length);
+    if(fp){
+      // same raw meat and cooked rice every day (values are per 2 boxes; 1 box = half)
+      meat=dens>0?fp.meat*fr:0;
+      const cooked=fp.rice*fr;
+      rice=ownC?(rpg.k>0?cooked/RICE.brown.y*riceMacroPerG('brown').k/rpg.k:0):cooked/RICE[ch.rice].y;
+    }else for(let i=0;i<5;i++){
       const riceM={k:rpg.k*rice,p:rpg.p*rice,c:rpg.c*rice,f:rpg.f*rice};
       const need=E.protein-fixed.p-base.p-riceM.p;
       meat=dens>0?clamp(need/dens,60*boxes,330*boxes):0;
@@ -555,7 +585,7 @@ function planDay(st,date){
       const byK=rpg.k>0?leftK/rpg.k:0;
       let byC=Infinity;
       if(carbMax){ const allowC=carbMax/100*E.target/4-(fixed.c+base.c+meatM.c); byC=rpg.c>0?allowC/rpg.c:Infinity; }
-      rice=clamp(Math.min(byK,byC),0,(m.carb&&m.carb.length?200:110)*boxes);
+      rice=clamp(Math.min(byK,byC),0,(ownC?260:150)*boxes);
     }
     for(const [k,sh] of m.p) items.push({k,g:r5(meat*sh),kind:'meat'});
     for(const [k,g] of m.x) items.push({k,g:Math.round(g*fr),kind:'extra'});
@@ -572,14 +602,46 @@ function planDay(st,date){
   const tot=addM(fixed,main);
   const left=E.target-tot.k;
   if(fixed.k>E.target*0.85&&boxes>0) notes.push('มื้อที่เลือกนอกเมนูหลักใช้พลังงานไปเกือบหมดแล้ว ข้าวในเมนูหลักจึงเหลือน้อย');
-  if(left>120) notes.push(carbMax&&tot.c*4/E.target*100>=carbMax-1?`ถึงเพดานคาร์บ ${carbMax}% แล้ว ยังเหลือ ${Math.round(left)} kcal เติมด้วยผัก ไข่ ถั่ว หรือเนื้อสัตว์ได้`:`ยังเหลือพลังงาน ${Math.round(left)} kcal เพิ่มผลไม้ นม หรือมันเทศได้`);
-  if(left<-80) notes.push(`เกินเป้า ${Math.round(-left)} kcal ลองเปลี่ยนมื้อนอกบ้านหรืออาหารว่างเป็นตัวเลือกที่เบากว่า`);
+  if(fp&&boxes>0&&(left>120||left<-80)) notes.push(left>0?`ล็อกปริมาณข้าวและเนื้อสัตว์ไว้เท่ากันทุกวัน วันนี้ยังเหลือ ${Math.round(left)} kcal จากเป้า เติมผลไม้ นม หรือไข่ต้มได้`:`ล็อกปริมาณข้าวและเนื้อสัตว์ไว้เท่ากันทุกวัน วันนี้เกินเป้า ${Math.round(-left)} kcal ไม่เป็นไรถ้าทั้งสัปดาห์เฉลี่ยใกล้เป้า หรือเลือกอาหารว่างที่เบาลง`);
+  else if(left>120) notes.push(carbMax&&tot.c*4/E.target*100>=carbMax-1?`ถึงเพดานคาร์บ ${carbMax}% แล้ว ยังเหลือ ${Math.round(left)} kcal เติมด้วยผัก ไข่ ถั่ว หรือเนื้อสัตว์ได้`:`ยังเหลือพลังงาน ${Math.round(left)} kcal เพิ่มผลไม้ นม หรือมันเทศได้`);
+  else if(left<-80) notes.push(`เกินเป้า ${Math.round(-left)} kcal ลองเปลี่ยนมื้อนอกบ้านหรืออาหารว่างเป็นตัวเลือกที่เบากว่า`);
   if(tot.p<E.protein-10) notes.push(`โปรตีนยังขาด ${Math.round(E.protein-tot.p)} ก. เพิ่มไข่ต้ม อกไก่ หรือกรีกโยเกิร์ต`);
   for(const s of slots){ const w=healthWarn(st,s.it); if(w) notes.push(`${SLOT_T_CALC[s.slot]||''} "${s.it.n}": ${w}`); }
   if(boxes>0){ const w=healthWarnMenu(st,m); if(w) notes.push(`เมนูหลัก "${m.n}": ${w}`); }
   const ry=(m.carb&&m.carb.length)?1:RICE[ch.rice].y;
   const pct={p:tot.p*4/Math.max(tot.k,1)*100,c:tot.c*4/Math.max(tot.k,1)*100,f:tot.f*9/Math.max(tot.k,1)*100};
-  return {E,ch,menu:m,boxes,slots,fixed,items,main,tot,pct,rice,riceCooked:rice*ry,notes};
+  return {E,ch,menu:m,locked:!!fp,boxes,slots,fixed,items,main,tot,pct,rice,riceCooked:rice*ry,notes};
+}
+// ---------- meat choice ----------
+const MEAT_OPTS={chicken:'อกไก่',thigh:'สะโพกไก่',pork:'หมูสันใน',beef:'เนื้อวัว',fish:'ปลาเนื้อขาว',mackerel:'ปลาทู',shrimp:'กุ้ง',squid:'หมึก',sea:'ทะเลรวม (กุ้ง+หมึก)',firmtofu:'เต้าหู้แข็ง'};
+const MEAT_MIX={sea:[['shrimp',0.5],['squid',0.5]]};
+function meatLabel(k){ return MEAT_OPTS[k]||(ING[k]&&ING[k].t)||k; }
+function menuWithMeat(m,meat){ if(!m||!meat||!(MEAT_MIX[meat]||ING[meat])||!(m.p&&m.p.length)) return m; return Object.assign({},m,{p:MEAT_MIX[meat]||[[meat,1]],meatSwap:meat}); }
+function menuMeatText(m){ return ((m&&m.p)||[]).map(([k])=>ING[k]?ING[k].t.replace(/\s*\(.*?\)/g,''):k).join(' + '); }
+function menuName(m){ return m?m.n+(m.meatSwap?` (ใช้${meatLabel(m.meatSwap)})`:''):''; }
+// ---------- same meat and rice every day ----------
+function fixedPortion(st){ const f=st.profile&&st.profile.fixedPortion; return f&&f.on&&Number(f.meat)>0&&Number(f.rice)>=0?{meat:Number(f.meat),rice:Number(f.rice)}:null; }
+function freePortion(st,date){
+  // what the energy-based plan gives for this day, per 2 boxes: raw meat g, cooked rice g (brown-rice equivalent when the menu has its own carb)
+  const P=planDay(st,date,{free:true}); if(!P.boxes) return null;
+  const fr=P.boxes/2;
+  const meat=P.items.filter(i=>i.kind==='meat').reduce((s,i)=>s+i.g,0)/fr;
+  const ownC=!!(P.menu.carb&&P.menu.carb.length);
+  const rk=P.items.filter(i=>i.kind==='rice').reduce((s,i)=>s+ingM(i.k,i.g).k,0)/fr;
+  const rt=ownC?'brown':P.ch.rice;
+  return {meat:r5(meat),rice:r5(rk/riceMacroPerG(rt).k*RICE[rt].y)};
+}
+function weekFreePortion(st,date){
+  const wk=mondayOf(date); let m=0,r=0,n=0;
+  for(let i=0;i<7;i++){const f=freePortion(st,addDays(wk,i)); if(f){m+=f.meat;r+=f.rice;n++;}}
+  return n?{meat:r5(m/n),rice:r5(r/n)}:null;
+}
+function ensureFixed(st,date){
+  // first run after this update: lock today's amounts (or the week's average if today has no home-cooked box)
+  if(st.profile.fixedPortion!==undefined) return st;
+  const f=freePortion(st,date)||weekFreePortion(st,date);
+  st.profile.fixedPortion=f?{on:true,meat:f.meat,rice:f.rice}:{on:false};
+  return st;
 }
 function weekShopping(st,wk){
   const g={}; let outCost=0; const outList={};
@@ -600,11 +662,11 @@ function weekShopping(st,wk){
   return {rows,buy,use,outCost,outList};
 }
 const GROUPS=[['protein','เนื้อสัตว์ ปลา เต้าหู้'],['dairy','ไข่ นม โยเกิร์ต'],['carb','ข้าว แป้ง เส้น'],['veg','ผัก ผลไม้'],['pantry','เครื่องปรุงและของแห้ง']];
-const GROUP_OF={chicken:'protein',thigh:'protein',pork:'protein',fish:'protein',shrimp:'protein',squid:'protein',mackerel:'protein',tuna:'protein',tofuegg:'protein',firmtofu:'protein',softtofu:'protein',
+const GROUP_OF={chicken:'protein',thigh:'protein',pork:'protein',beef:'protein',fish:'protein',shrimp:'protein',squid:'protein',mackerel:'protein',tuna:'protein',tofuegg:'protein',firmtofu:'protein',softtofu:'protein',
  egg:'dairy',milk:'dairy',greekyog:'dairy',soymilk:'dairy',whey:'dairy',
  rice_brown:'carb',rice_white:'carb',rice_sticky:'carb',rice_berry:'carb',grains:'carb',glassnoodle:'carb',oats:'carb',bread:'carb',flour:'carb',sweetpotato:'carb',
  veg:'veg',papaya:'veg',pineapple:'veg',fruit:'veg',banana:'veg',pumpkin:'veg',orange:'veg',dragonfruit:'veg'};
-function groupOf(k){ if(GROUP_OF[k]) return GROUP_OF[k]; const i=ING[k]; if(!i) return 'pantry'; if(i.p>=12&&i.c<10) return 'protein'; if(i.c>=50) return 'carb'; if(i.k<=60) return 'veg'; return 'pantry'; }
+function groupOf(k){ if(GROUP_OF[k]) return GROUP_OF[k]; if(k.startsWith('x_meat_')) return 'protein'; const i=ING[k]; if(!i) return 'pantry'; if(i.p>=12&&i.c<10) return 'protein'; if(i.c>=50) return 'carb'; if(i.k<=60) return 'veg'; return 'pantry'; }
 function kgText(g,k){
   const u=ING[k]&&ING[k].unit; const ml=/มล\./.test(ING[k]?ING[k].t:'');
   if(u) return `${Math.ceil(g/u.g)} ${u.t}`;
@@ -626,9 +688,9 @@ function ifSchedule(st,date){
   const custom=c.day[date];
   if(!custom&&c.skipLong&&LONG_SHIFTS.includes(sh)) return {skipped:true,sh};
   const fast=IF_MODES[c.mode].fast, eat=24-fast, s=hm2m(custom||c.start[sh]||'10:00'), e=s+eat*60;
-  const meals=[{t:m2hm(s),label:'มื้อเปิด',slots:['bf','m1'],note:'มื้อแรก + มื้อหลัก 1 (เริ่มด้วยโปรตีนและผัก)'}];
-  if(eat>=8) meals.push({t:m2hm(Math.round((s+eat*27)/30)*30),label:'ว่าง',slots:['s1'],note:'อาหารว่าง 1'});
-  meals.push({t:m2hm(e-45),label:'มื้อปิด',slots:['m2','s2'],note:'มื้อหลัก 2 + ว่าง 2 กินให้เสร็จก่อนปิดช่วงกิน'});
+  const meals=[{t:m2hm(s),label:'มื้อเปิด',slots:['m1'],note:'มื้อหลัก 1 (เริ่มด้วยโปรตีนและผัก)'}];
+  meals.push({t:m2hm(Math.round((s+eat*27)/30)*30),label:'ว่าง',slots:['s1'],note:'อาหารว่าง'});
+  meals.push({t:m2hm(e-45),label:'มื้อปิด',slots:['m2'],note:'มื้อหลัก 2 กินให้เสร็จก่อนปิดช่วงกิน'});
   return {mode:c.mode,fast,eat,sh,custom:!!custom,start:m2hm(s),end:m2hm(e),startMin:s,endMin:e,meals};
 }
 function ifStatus(st,now){
@@ -646,7 +708,7 @@ function ifStatus(st,now){
 }
 // ---------- snack rotation (same 3 fruits every week) ----------
 const SNACK_ROT=['sn_yog_banana','sn_yog_orange','sn_yog_dragon'];
-const SLOT_T_CALC={bf:'มื้อแรก',m1:'มื้อหลัก 1',m2:'มื้อหลัก 2',s1:'ว่าง 1',s2:'ว่าง 2',drink:'เครื่องดื่ม'};
+const SLOT_T_CALC={bf:'มื้อแรก',m1:'มื้อหลัก 1',m2:'มื้อหลัก 2',s1:'อาหารว่าง',s2:'ว่าง 2',drink:'เครื่องดื่ม'};
 function dowIdx(date){ return (parseYmd(date).getDay()+6)%7; }
 // ---------- health conditions ----------
 const HEALTH={
@@ -961,7 +1023,7 @@ function defaults(){
     v:2,
     profile:{sex:'m',age:28,height:170,startWeight:110,goal:65,proteinX:1.5,startDate:TODAY,carbMax:45,rice:'brown'},
     shifts, ex:{}, days:{}, weighed:{}, custom:[], prices:{}, customIng:{}, customMenus:[],
-    weights:[{d:TODAY,w:110}], adjust:0, sample:true
+    weights:[{d:TODAY,w:110}], adjust:0, sample:true, eat:{}, customMeats:{}
   };
 }
 function merge(s){
@@ -971,10 +1033,12 @@ function merge(s){
   registerCustom(out);
   if(s.menu&&!s.v){ for(const k in s.menu){(out.days[k]=out.days[k]||{}).menu=s.menu[k];} }
   delete out.menu; delete out.fixed; delete out.fixedDay; out.v=2;
+  out.eat=out.eat||{}; out.customMeats=out.customMeats||{};
+  ensureFixed(out,TODAY);
   return out;
 }
 function load(){try{const s=localStorage.getItem('nurse-weight-v1');return s?merge(JSON.parse(s)):null;}catch(e){return null;}}
-let state=load()||defaults();
+let state=ensureFixed(load()||defaults(),TODAY);
 registerCustom(state);
 let dbRef=null, saving=false, pending=false, saveTimer=null, lastSavedJson=null;
 function setStatus(kind,text){const el=document.getElementById('status');el.innerHTML='<span class="dot '+kind+'"></span><span></span>';el.lastChild.textContent=text;}
@@ -1032,7 +1096,7 @@ function thDate(s,withDay=true){const d=parseYmd(s);return (withDay?THDAY[d.getD
 function chip(sh){return '<span class="chip '+sh+'" title="'+esc(SHIFTS[sh].full)+'">'+SHIFTS[sh].t+'</span>';}
 let rosterAi={file:null,url:null,busy:false,res:null,err:'',name:'',month:TODAY.slice(0,7)};
 let selDate=TODAY, rosterWeek=mondayOf(TODAY), weighMode=false, catFilter='', photo={file:null,url:null,busy:false,res:null,err:''}, aiMenu={busy:false,res:null,err:'',q:''};
-const SLOT_T={bf:'มื้อแรก',m1:'มื้อหลัก 1',m2:'มื้อหลัก 2',s1:'ว่าง 1',s2:'ว่าง 2',drink:'เครื่องดื่ม'};
+const SLOT_T={bf:'มื้อแรก',m1:'มื้อหลัก 1',m2:'มื้อหลัก 2',s1:'อาหารว่าง',s2:'ว่าง 2',drink:'เครื่องดื่ม'};
 
 function itemOptions(sel,cats,{none=true,home=false,homeLabel=''}={}){
   const all=allItems(state);
@@ -1061,7 +1125,7 @@ function viewToday(){
   const w=E.w, p=state.profile;
   const exs=state.ex[TODAY]||[];
   const bmi=p.height?w/((p.height/100)**2):null;
-  const meal=(slot,id)=>{ if(id==='home') return `<li><b>${SLOT_T[slot]}:</b> ${esc(P.menu.n)} (กล่องที่ทำเอง)</li>`; const it=itemById(state,id); return it?`<li><b>${SLOT_T[slot]}:</b> ${esc(it.n)} <span class="muted num">${Math.round(itemM(it).k)} kcal</span></li>`:''; };
+  const meal=(slot,id)=>{ if(id==='home') return `<li><b>${SLOT_T[slot]}:</b> ${esc(menuName(P.menu))} (กล่องที่ทำเอง)</li>`; const it=itemById(state,id); return it?`<li><b>${SLOT_T[slot]}:</b> ${esc(it.n)} <span class="muted num">${Math.round(itemM(it).k)} kcal</span></li>`:''; };
   return `
   ${state.sample?`<p class="note warn">ตารางเวรสัปดาห์นี้เป็นตัวอย่าง แก้ให้ตรงกับเวรจริงที่หน้า "ตารางเวร & ออกกำลัง" ส่วนส่วนสูงยังเป็นค่าประมาณ 170 ซม. แก้ได้ที่หน้าโปรไฟล์</p>`:''}
   ${ifBanner()}
@@ -1071,6 +1135,7 @@ function viewToday(){
       <div class="hero-row">${ring(P.tot.k,E.target)}<div><span class="big num">${fmt(E.target)}</span><span class="unit">kcal</span><div class="small muted">เป้าวันนี้</div></div></div>
       <div class="small muted">ใช้ไป ${fmt(E.tdee)} kcal (${esc(SHIFTS[E.sh].full)}${E.noEx?(E.ex?` + เผื่อเท่าวันปกติ ${fmt(E.ex)}`:''):(E.ex?` + ออกกำลัง ${fmt(E.ex)} นับครึ่งหนึ่ง`:'')}) · กินน้อยกว่า ${fmt(E.deficit)} kcal${state.adjust?` · ปรับ ${state.adjust>0?'+':''}${state.adjust}`:''}</div>
       ${macroBar(P)}
+      ${eatHeroLine()}
     </section>
     <section class="card">
       <div class="spread"><span class="label">โปรตีนต่อวัน</span>
@@ -1084,7 +1149,8 @@ function viewToday(){
   <div class="grid cols-2" style="margin-top:12px">
     <section class="card">
       <div class="spread"><h2>มื้ออาหารวันนี้</h2><a href="#menu" class="small">เปลี่ยนเมนู / ดูวัตถุดิบ</a></div>
-      <ul class="small" style="margin:0;padding-left:18px">${meal('bf',P.ch.bf)}${meal('m1',P.ch.m1)}${meal('m2',P.ch.m2)}${meal('s1',P.ch.s1)}${meal('s2',P.ch.s2)}${P.ch.drinks.map(id=>meal('drink',id)).join('')}</ul>
+      <ul class="small" style="margin:0;padding-left:18px">${meal('m1',P.ch.m1)}${meal('m2',P.ch.m2)}${meal('s1',P.ch.s1)}${P.ch.drinks.map(id=>meal('drink',id)).join('')}</ul>
+      ${portionLine(P)}
       ${ifTodayBlock(E)}
       ${P.notes.map(n=>`<p class="note warn">${esc(n)}</p>`).join('')}
     </section>
@@ -1096,6 +1162,7 @@ function viewToday(){
       ${E.sh==='N'?'<p class="note">หลังเวรดึกห้ามออกกำลังหนัก นอนก่อน</p>':''}`}
     </section>
   </div>
+  ${eatCard()}
   ${recipeCard()}
   <section class="card" style="margin-top:12px">
     <div class="spread"><h2>บันทึกน้ำหนักวันนี้</h2><span class="small muted">ชั่งหลังตื่นนอนและเข้าห้องน้ำ</span></div>
@@ -1168,8 +1235,8 @@ function viewMenu(){
       ${weighMode?`<td class="r"><input class="weigh" data-k="${it.k}" type="number" min="0" step="1" value="${act??''}" aria-label="น้ำหนักที่ชั่งได้ ${esc(ing.t)}" style="width:84px"> <button class="ghost small use-scale" data-k="${it.k}" ${scale.connected?'':'disabled'} title="รับค่าจากตาชั่ง">⚖</button></td><td>${st}</td>`:''}</tr>`;
   }).join('');
   const menuOpts=MENUS.map((m,i)=>({m,i})).concat(state.customMenus.map(m=>({m,i:m.id}))).filter(o=>!catFilter||o.m.c===catFilter||o.i===ch.menu);
-  const mainLabel=`ทำเอง: ${P.menu.n}`;
-  const slotRow=(slot,sel,cats,opts)=>`<label class="slot"><span class="slot-t">${SLOT_T[slot]}</span><select class="slot-sel" data-slot="${slot}" aria-label="${SLOT_T[slot]}">${itemOptions(sel,cats,opts)}</select></label>`;
+  const mainLabel=`ทำเอง: ${menuName(P.menu)}`;
+  const slotRow=(slot,sel,cats,opts)=>`<label class="slot"><span class="slot-t">${SLOT_T[slot]}</span><select class="slot-sel searchable" data-slot="${slot}" aria-label="${SLOT_T[slot]}">${itemOptions(sel,cats,opts)}</select></label>`;
   return `
   ${weekPlanCard(wk)}
   <section class="card" style="margin-top:12px">
@@ -1178,13 +1245,11 @@ function viewMenu(){
     <div class="spread small"><span>เป้า <b class="num">${fmt(P.E.target)} kcal</b> · โปรตีน <b class="num">${P.E.protein} ก.</b></span><span>แผนได้ <b class="num">${fmt(P.tot.k)} kcal</b> · <b class="num">${Math.round(P.tot.p)} ก.</b></span></div>
     ${macroBar(P)}
     <div class="slots">
-      ${slotRow('bf',ch.bf,['bf','711','shop','custom'])}
-      ${slotRow('m1',ch.m1,['711','shop','custom'],{none:false,home:true,homeLabel:mainLabel})}
-      ${slotRow('m2',ch.m2,['711','shop','custom'],{none:false,home:true,homeLabel:mainLabel})}
+      ${slotRow('m1',ch.m1,['bf','711','shop','custom'],{none:false,home:true,homeLabel:mainLabel})}
+      ${slotRow('m2',ch.m2,['bf','711','shop','custom'],{none:false,home:true,homeLabel:mainLabel})}
       ${slotRow('s1',ch.s1,['snack','fruit','dessert','711','custom'])}
-      ${slotRow('s2',ch.s2,['snack','fruit','dessert','711','custom'])}
       <div class="slot"><span class="slot-t">เครื่องดื่ม</span><div class="row">${ch.drinks.map((id,j)=>{const it=itemById(state,id);return it?`<span class="tag">${esc(it.n)} <span class="muted num">${Math.round(itemM(it).k)}</span><button class="ghost small" data-drdel="${j}" aria-label="เอาออก">×</button></span>`:'';}).join('')}
-        <select id="drink-add" aria-label="เพิ่มเครื่องดื่ม"><option value="">+ เพิ่มเครื่องดื่ม</option>${itemOptions('',['drink','711','custom'],{none:false}).replace('<option value="" selected>— ไม่กิน —</option>','')}</select></div></div>
+        <select id="drink-add" class="searchable" aria-label="เพิ่มเครื่องดื่ม"><option value="">+ เพิ่มเครื่องดื่ม</option>${itemOptions('',['drink','711','custom'],{none:false}).replace('<option value="" selected>— ไม่กิน —</option>','')}</select></div></div>
     </div>
     ${P.notes.map(n=>`<p class="note warn">${esc(n)}</p>`).join('')}
   </section>
@@ -1193,9 +1258,12 @@ function viewMenu(){
     <div class="spread"><h2>เมนูหลักทำเอง</h2><span class="small muted">${P.boxes?`ทำ 1 หม้อ แบ่ง ${P.boxes} กล่อง`:'วันนี้ไม่ได้ทำเอง (ซื้อทั้ง 2 มื้อ)'}</span></div>
     <div class="row seg" role="group" aria-label="กรองตามวิธีทำ"><button class="${!catFilter?'on':''}" data-cat="">ทั้งหมด</button>${Object.entries(CATS).map(([k,v])=>`<button class="${catFilter===k?'on':''}" data-cat="${k}">${v}</button>`).join('')}</div>
     <div class="grid cols-2">
-      <label class="f">เมนู (${menuOpts.length} รายการ)<select id="menu-sel">${menuOpts.filter(o=>typeof o.i==='number').map(o=>`<option value="${o.i}" ${o.i===ch.menu?'selected':''}>${esc(o.m.n)} · ${CATS[o.m.c]}</option>`).join('')}${menuOpts.some(o=>typeof o.i==='string')?`<optgroup label="เมนูของฉัน (AI)">${menuOpts.filter(o=>typeof o.i==='string').map(o=>`<option value="${o.i}" ${o.i===ch.menu?'selected':''}>${esc(o.m.n)} · ${CATS[o.m.c]||'อื่นๆ'}</option>`).join('')}</optgroup>`:''}</select></label>
+      <label class="f">เมนู (${menuOpts.length} รายการ)<select id="menu-sel" class="searchable" aria-label="เมนูหลัก">${menuOpts.filter(o=>typeof o.i==='number').map(o=>`<option value="${o.i}" ${o.i===ch.menu?'selected':''}>${esc(o.m.n)} · ${CATS[o.m.c]}</option>`).join('')}${menuOpts.some(o=>typeof o.i==='string')?`<optgroup label="เมนูของฉัน (AI)">${menuOpts.filter(o=>typeof o.i==='string').map(o=>`<option value="${o.i}" ${o.i===ch.menu?'selected':''}>${esc(o.m.n)} · ${CATS[o.m.c]||'อื่นๆ'}</option>`).join('')}</optgroup>`:''}</select></label>
+      <label class="f">เนื้อสัตว์<select id="meat-sel" class="searchable" aria-label="เนื้อสัตว์" ${P.menu.p&&P.menu.p.length?'':'disabled'}>${meatOptions(getMenu(state,ch.menu),ch.meat)}</select></label>
       ${ownCarb?`<div class="small muted" style="align-self:end">เมนูนี้มีแป้งของตัวเอง (${P.menu.carb.map(([k])=>esc(ING[k].t)).join(', ')}) แอปปรับปริมาณแป้งให้แทนข้าว</div>`:`<label class="f">ข้าว<select id="rice-sel">${Object.entries(RICE).map(([k,v])=>`<option value="${k}" ${k===ch.rice?'selected':''}>${esc(v.t)}</option>`).join('')}</select></label>`}
     </div>
+    ${meatAiCard()}
+    ${fixedPortionCard(P)}
     ${stepsBlock(P.menu)}
     ${P.boxes?`<div class="tablewrap"><table>
       <thead><tr><th>วัตถุดิบ (ชั่งตอนดิบ)</th><th class="r">ทั้งวัน (ก.)</th><th class="r">ต่อกล่อง (ก.)</th>${weighMode?'<th class="r">ชั่งได้ (ก.)</th><th>สถานะ</th>':''}</tr></thead>
@@ -1253,7 +1321,7 @@ function photoCard(){
         <label class="f">ราคา (บาท)<input id="pr-price" type="number" value=""></label>
       </div>
       ${r.note?`<p class="small muted">${esc(r.note)}</p>`:''}
-      <div class="row"><span class="small">ใช้เป็น:</span>${['m1','m2','s1','s2','bf'].map(s=>`<button data-photo-use="${s}">${SLOT_T[s]}</button>`).join('')}</div>
+      <div class="row"><span class="small">ใช้เป็น:</span>${['m1','m2','s1'].map(s=>`<button data-photo-use="${s}">${SLOT_T[s]}</button>`).join('')}<button data-photo-use="eat">บันทึกว่ากินแล้ว (${thDate(eatDate,false)})</button></div>
       <p class="small muted">ค่าจากรูปเป็นการประมาณ คลาดได้ ±20–30% ถ้ามีฉลากให้ใช้ตัวเลขบนฉลาก</p>
     </div>`:''}`;
 }
@@ -1425,9 +1493,10 @@ function usePhoto(slot){
   const it={id:'c_'+Date.now(),cat:'custom',n:photo.res.name+' (จากรูป)',m:{k:v('pr-k'),p:v('pr-p'),c:v('pr-c'),f:v('pr-f')}};
   const pr=v('pr-price'); if(pr) it.price=pr;
   state.custom.push(it);
-  if(slot==='drink'){const d=dayChoice(state,selDate);setDay(selDate,{drinks:d.drinks.concat(it.id)});} else setDay(selDate,{[slot]:it.id});
+  if(slot==='eat'){eatAdd(eatDate,it.id);}
+  else if(slot==='drink'){const d=dayChoice(state,selDate);setDay(selDate,{drinks:d.drinks.concat(it.id)});} else setDay(selDate,{[slot]:it.id});
   photo={file:null,url:null,busy:false,res:null,err:''};
-  commit(); toast('ใส่ใน '+SLOT_T[slot]+' แล้ว และเก็บไว้ใน "รายการของฉัน"');
+  commit(); toast((slot==='eat'?'บันทึกการกินแล้ว':'ใส่ใน '+SLOT_T[slot]+' แล้ว')+' และเก็บไว้ใน "รายการของฉัน"');
 }
 
 // ---------- AI menu from a dish name ----------
@@ -1517,7 +1586,7 @@ function weekPlanCard(wk){
   let wk_k=0;
   const rows=days.map(d=>{const P=planDay(state,d);wk_k+=P.tot.k;const own=P.menu.carb&&P.menu.carb.length;
     return `<tr class="${d===selDate?'sel':''}"><td><button class="ghost small" data-pick="${d}" title="ดูรายละเอียดวันนี้">${thDate(d)}</button> ${chip(P.E.sh)}</td>
-      <td><select class="wk-menu" data-date="${d}" aria-label="เมนู ${thDate(d)}">${opts(P.ch.menu)}</select></td>
+      <td><select class="wk-menu searchable" data-date="${d}" aria-label="เมนู ${thDate(d)}">${opts(P.ch.menu)}</select><select class="wk-meat searchable" data-date="${d}" aria-label="เนื้อสัตว์ ${thDate(d)}" ${P.menu.p&&P.menu.p.length?'':'disabled'}>${meatOptions(getMenu(state,P.ch.menu),P.ch.meat)}</select></td>
       <td>${own?'<span class="small muted">แป้งในเมนู</span>':`<select class="wk-rice" data-date="${d}" aria-label="ข้าว ${thDate(d)}">${Object.entries(RICE).map(([k,v])=>`<option value="${k}" ${k===P.ch.rice?'selected':''}>${esc(v.t.split(' (')[0])}</option>`).join('')}</select>`}</td>
       <td class="small">${P.boxes===2?'ทำ 2 กล่อง':P.boxes===1?'ทำ 1 กล่อง + ซื้อ 1':'ซื้อทั้ง 2 มื้อ'}</td>
       <td class="r num small">${fmt(P.tot.k)} / ${fmt(P.E.target)}<div class="muted">P ${Math.round(P.tot.p)}</div></td></tr>`;}).join('');
@@ -1525,7 +1594,7 @@ function weekPlanCard(wk){
     <div class="spread"><h2>แผนเมนูทั้งสัปดาห์</h2>
       <div class="row"><button id="wkp-prev" aria-label="สัปดาห์ก่อน">‹</button><span class="small">${thDate(days[0],false)} – ${thDate(days[6],false)}</span><button id="wkp-next" aria-label="สัปดาห์ถัดไป">›</button></div></div>
     <p class="small muted">เลือกเมนูหลักของแต่ละวันให้ครบทั้งสัปดาห์ แล้วไปที่แท็บ "ซื้อของ" เพื่อดูวัตถุดิบที่ต้องใช้และรายการแบ่งถุง เปลี่ยนมื้อนอกบ้านหรืออาหารว่างได้ที่ "วางแผนมื้อรายวัน" (กดที่วันที่)</p>
-    <div class="tablewrap"><table class="wkplan"><thead><tr><th>วัน</th><th>เมนูหลัก (ทำเอง)</th><th>ข้าว</th><th>กล่อง</th><th class="r">kcal แผน/เป้า</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="tablewrap"><table class="wkplan"><thead><tr><th>วัน</th><th>เมนูหลัก (ทำเอง) · เนื้อสัตว์</th><th>ข้าว</th><th>กล่อง</th><th class="r">kcal แผน/เป้า</th></tr></thead><tbody>${rows}</tbody></table></div>
     <div class="row"><button id="wk-auto" class="primary">จัดเมนูให้อัตโนมัติ (ไม่ซ้ำ สลับวิธีทำ)</button><button id="wk-copyprev">ใช้เมนูชุดเดียวกับสัปดาห์ก่อน</button><button id="wk-rice-all" class="ghost">ใช้ข้าว ${esc(RICE[state.profile.rice||'brown'].t.split(' (')[0])} ทั้งสัปดาห์</button></div>
     <p class="small muted">เฉลี่ย ${fmt(wk_k/7)} kcal/วัน</p>
   </section>`;
@@ -1545,7 +1614,7 @@ function prepList(wk){
   return days.map(d=>{const P=planDay(state,d); if(!P.boxes) return `<li><b>${thDate(d)}</b> ไม่ได้ทำเอง</li>`;
     const meat=P.items.filter(i=>i.kind==='meat').map(i=>`${esc(ING[i.k].t)} ${i.g} ก.`).join(' + ');
     const carb=P.items.filter(i=>i.kind==='rice').map(i=>`${esc(ING[i.k].t)} ${i.g} ก.`).join(' + ');
-    return `<li><b>${thDate(d)}</b> · ${esc(P.menu.n)}<br><span class="small">ถุงเนื้อสัตว์: ${meat||'–'} · ${carb?'แป้ง/ข้าวดิบ: '+carb:''}</span></li>`;}).join('');
+    return `<li><b>${thDate(d)}</b> · ${esc(menuName(P.menu))}<br><span class="small">ถุงเนื้อสัตว์: ${meat||'–'} · ${carb?'แป้ง/ข้าวดิบ: '+carb:''}</span></li>`;}).join('');
 }
 
 // ---------- roster from photo ----------
@@ -1593,6 +1662,226 @@ Include only days that exist in that month, in order.`;
 // ---------- UI bits ----------
 function ring(v,t){const pct=clamp(v/Math.max(t,1),0,1.2);const R=34,C=2*Math.PI*R;const over=v>t*1.03;
   return `<svg class="ring" viewBox="0 0 84 84" role="img" aria-label="แผน ${fmt(v)} จาก ${fmt(t)} kcal"><circle cx="42" cy="42" r="${R}" fill="none" stroke="var(--line)" stroke-width="8"/><circle cx="42" cy="42" r="${R}" fill="none" stroke="${over?'var(--warn)':'var(--accent)'}" stroke-width="8" stroke-linecap="round" stroke-dasharray="${(Math.min(pct,1)*C).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 42 42)"/><text x="42" y="40" text-anchor="middle" font-size="15" font-weight="600" fill="var(--ink)">${Math.round(pct*100)}%</text><text x="42" y="54" text-anchor="middle" font-size="9" fill="var(--muted)">ตามแผน</text></svg>`;}
+
+// ---------- meat choice and same-amount-every-day ----------
+function meatOptions(m0,sel){
+  const base=menuMeatText(m0)||'ไม่มีเนื้อสัตว์';
+  const cm=Object.entries(state.customMeats||{}).filter(([k])=>ING[k]);
+  return `<option value="" ${!sel?'selected':''}>ตามสูตร (${esc(base)})</option>`
+    +`<optgroup label="เนื้อสัตว์ทั่วไป">`+Object.entries(MEAT_OPTS).map(([k,v])=>`<option value="${k}" ${k===sel?'selected':''}>${esc(v)}</option>`).join('')+`</optgroup>`
+    +(cm.length?`<optgroup label="ที่ AI หาให้">`+cm.map(([k,v])=>`<option value="${k}" ${k===sel?'selected':''}>${esc(v)} · ${Math.round(ING[k].k)} kcal · P ${Math.round(ING[k].p)}/100 ก.</option>`).join('')+`</optgroup>`:'')
+    +`<option value="__ai" data-always="1" data-qt="🔎 ค้นหา &quot;{q}&quot; ด้วย AI">🔎 ไม่มีในรายการ? ค้นหาด้วย AI</option>`;
+}
+// ---------- find any meat with AI ----------
+let meatAi={open:false,busy:false,q:'',res:null,err:'',date:null};
+function meatAiCard(){
+  const show=meatAi.open||meatAi.busy||meatAi.res||meatAi.err;
+  const date=meatAi.date||selDate; const r=meatAi.res;
+  const cm=Object.entries(state.customMeats||{}).filter(([k])=>ING[k]);
+  if(!show) return `<p class="small muted">ไม่มีเนื้อสัตว์ที่ต้องการ? พิมพ์ชื่อในช่องเนื้อสัตว์ แล้วเลือก "ค้นหาด้วย AI" หรือ <button class="ghost small" id="meatai-open">ค้นหาเนื้อสัตว์ด้วย AI</button></p>`;
+  return `<div class="howto meatai" id="meatai">
+    <div class="spread"><b>ค้นหาเนื้อสัตว์ด้วย AI</b><button class="ghost small" id="meatai-close" aria-label="ปิด">×</button></div>
+    ${!sampleFn?`<p class="small muted">ต้องตั้งค่า AI ที่หน้า <a href="#profile">ตั้งค่า</a> ก่อน (Gemini ใช้ฟรี)</p>`:`
+    <form id="meatai-form" class="row"><input id="meatai-q" required value="${esc(meatAi.q)}" placeholder="เช่น อกเป็ด, แซลมอน, ปลากะพง, ตับไก่, เนื้อปู" style="flex:1;min-width:200px" aria-label="ชื่อเนื้อสัตว์">
+      <button class="primary" type="submit" ${meatAi.busy?'disabled':''}>${meatAi.busy?'กำลังค้นหา…':'ค้นหา'}</button></form>`}
+    ${meatAi.err?`<p class="note warn">${esc(meatAi.err)}</p>`:''}
+    ${r?`<label class="f">ชื่อ<input id="mai-name" value="${esc(r.name)}"></label>
+      <div class="nums">
+        <label class="f">kcal/100 ก.<input class="mai-n" data-f="kcal" type="number" min="0" step="0.1" value="${r.kcal}"></label>
+        <label class="f">โปรตีน (ก.)<input class="mai-n" data-f="protein" type="number" min="0" step="0.1" value="${r.protein}"></label>
+        <label class="f">คาร์บ (ก.)<input class="mai-n" data-f="carbs" type="number" min="0" step="0.1" value="${r.carbs}"></label>
+        <label class="f">ไขมัน (ก.)<input class="mai-n" data-f="fat" type="number" min="0" step="0.1" value="${r.fat}"></label>
+        <label class="f">ราคา บาท/กก.<input class="mai-n" data-f="price" type="number" min="0" step="1" value="${r.price}"></label>
+      </div>
+      <p class="small muted">ค่าต่อ 100 ก. ดิบ · แหล่งข้อมูล: ${esc(r.source)}${r.note?' · '+esc(r.note):''}</p>
+      ${r.flag?'<p class="note warn">kcal ไม่ตรงกับ 4×P + 4×C + 9×F ควรตรวจกับฉลากหรือฐานข้อมูลก่อนใช้</p>':''}
+      ${r.p<10?'<p class="note warn">โปรตีนต่ำกว่า 10 ก./100 ก. ต้องกินปริมาณมากจึงจะได้โปรตีนตามเป้า</p>':''}
+      <div class="row"><button class="primary" id="meatai-use">บันทึกและใช้กับ ${thDate(date)}</button><button id="meatai-save">บันทึกไว้เลือกภายหลัง</button></div>`:''}
+    ${cm.length?`<div class="small">ที่ AI หาไว้แล้ว: ${cm.map(([k,v])=>`<span class="tag">${esc(v)} <span class="muted num">${Math.round(ING[k].k)} kcal · P ${Math.round(ING[k].p)}</span><button class="ghost small" data-meatdel="${k}" aria-label="ลบ ${esc(v)}">×</button></span>`).join(' ')}</div>`:''}
+  </div>`;
+}
+async function runMeatAi(q){
+  q=String(q||'').trim(); if(!q) return;
+  if(!sampleFn){ meatAi=Object.assign(meatAi,{open:true,q,err:'',res:null}); render(); return; }
+  meatAi=Object.assign(meatAi,{open:true,busy:true,q,res:null,err:''}); render();
+  const el=document.getElementById('meatai'); if(el) el.scrollIntoView({behavior:'smooth',block:'center'});
+  const prompt=`You are a registered dietitian. The user (Thailand) wants to cook with this protein food: "${q}".
+If several cuts exist, pick the common lean cut a person losing weight would buy (e.g. skinless breast) and say which in the Thai name.
+Give nutrition per 100 g RAW edible portion from USDA FoodData Central (name the food and FDC ID if you know it) or the Thai Food Composition Database by INMU, Mahidol University. Use the database values you know; do not invent precision.
+Estimate the Thai retail price per kg in baht (supermarket/Makro).
+If it is not a meat, fish, seafood, egg or tofu/plant protein, reply {"error":"not_protein"}.
+Reply with only JSON: {"name":"ชื่อภาษาไทย (ส่วนที่เลือก)","key":"short_english_snake_case","kcal":0,"protein":0,"carbs":0,"fat":0,"source":"แหล่งข้อมูล","price_per_kg_thb":0,"note":"ข้อแนะนำสั้นๆ ภาษาไทย เช่น ลอกหนัง ตัดมัน วิธีปรุงที่เหมาะ"}`;
+  try{
+    const r=await sampleFn.json(prompt,{});
+    if(r&&r.error) throw {code:'refused'};
+    const n=v=>+(Math.max(0,Number(v)||0)).toFixed(1);
+    const res={name:String(r.name||q).slice(0,60),key:String(r.key||'meat').toLowerCase().replace(/[^a-z0-9_]/g,'_').slice(0,30)||'meat',kcal:n(r.kcal),protein:n(r.protein),carbs:n(r.carbs),fat:n(r.fat),price:Math.round(Math.max(0,Number(r.price_per_kg_thb)||0)),source:String(r.source||'ไม่ระบุ').slice(0,140),note:String(r.note||'').slice(0,200)};
+    if(!(res.kcal>0)||!(res.protein>0)) throw {code:'invalid_json'};
+    meatAiCheck(res); meatAi.res=res;
+  }catch(e){
+    const c=e&&e.code;
+    meatAi.err=c==='refused'?'"'+q+'" ไม่ใช่เนื้อสัตว์หรืออาหารโปรตีน ลองพิมพ์ชื่ออื่น':c==='rate_limited'?'ใช้งานถี่เกินไปหรือโควตาฟรีหมด รอสักครู่แล้วลองใหม่':c==='invalid_json'?'AI ตอบกลับมาไม่ครบ ลองกดค้นหาอีกครั้ง หรือพิมพ์ชื่อให้ชัดขึ้น':'ค้นหาไม่สำเร็จ'+(e&&e.message?': '+e.message:'');
+  }
+  meatAi.busy=false; render();
+}
+function meatAiCheck(r){ const est=4*r.protein+4*r.carbs+9*r.fat; r.flag=r.kcal>40&&Math.abs(est-r.kcal)/r.kcal>0.2; r.p=r.protein; return r; }
+function saveMeatAi(use){
+  const r=meatAi.res; if(!r) return;
+  const nm=(document.getElementById('mai-name')||{}).value; if(nm&&nm.trim()) r.name=nm.trim().slice(0,60);
+  state.customMeats=state.customMeats||{};
+  let key=Object.keys(state.customMeats).find(k=>state.customMeats[k]===r.name&&ING[k]);
+  if(!key) key='x_meat_'+r.key+'_'+Date.now().toString(36);
+  state.customIng[key]={t:r.name,k:r.kcal,p:r.protein,c:r.carbs,f:r.fat,src:r.source,buy:{g:1000,price:r.price||0,label:r.name+' 1 กก. (ราคาประมาณจาก AI)',src:'e'}};
+  state.customMeats[key]=r.name;
+  registerCustom(state);
+  const date=meatAi.date||selDate;
+  if(use) setDay(date,{meat:key});
+  meatAi={open:false,busy:false,q:'',res:null,err:'',date:null};
+  commit(); toast(use?`ใช้${r.name}กับ ${thDate(date)} แล้ว`:`บันทึก${r.name}แล้ว เลือกได้ในช่องเนื้อสัตว์`);
+}
+function portionLine(P){
+  if(!P.boxes) return '';
+  const meat=P.items.filter(i=>i.kind==='meat').reduce((s,i)=>s+i.g,0);
+  const own=!!(P.menu.carb&&P.menu.carb.length);
+  const rc=own?P.items.filter(i=>i.kind==='rice').reduce((s,i)=>s+i.g,0):r5(P.riceCooked);
+  return `<p class="small">กล่องทำเองทั้งวัน: เนื้อสัตว์ดิบ <b class="num">${meat} ก.</b> · ${own?'แป้ง/เส้นดิบ':'ข้าวสุก'} <b class="num">${rc} ก.</b>${P.boxes===2?` <span class="muted">(กล่องละ ${r5(meat/2)} / ${r5(rc/2)} ก.)</span>`:''}${P.locked?' <span class="pill good">เท่ากันทุกวัน</span>':''}</p>`;
+}
+function fixedPortionCard(P){
+  const f=state.profile.fixedPortion||{}; const rt=P.ch.rice; const own=!!(P.menu.carb&&P.menu.carb.length);
+  const free=freePortion(state,selDate);
+  return `<div class="howto">
+    <label class="row"><input type="checkbox" id="fp-on" ${f.on?'checked':''}> <b>ใช้ปริมาณเนื้อสัตว์และข้าวเท่ากันทุกวัน</b></label>
+    ${f.on?`<div class="grid cols-3">
+      <label class="f">เนื้อสัตว์ดิบ (ก./วัน)<input id="fp-meat" type="number" min="5" max="1500" step="5" value="${f.meat||''}"></label>
+      <label class="f">ข้าวสุก (ก./วัน)<input id="fp-rice" type="number" min="0" max="2000" step="5" value="${f.rice??''}"></label>
+      <div class="small muted" style="align-self:end">กล่องละครึ่งหนึ่ง · ข้าวสุก ${f.rice||0} ก. ≈ ${esc(RICE[rt].t.split(' (')[0])}ดิบ ${r5((f.rice||0)/RICE[rt].y)} ก.</div></div>
+      <div class="row"><button id="fp-today" class="ghost small">ใช้ค่าที่คำนวณของ ${thDate(selDate)}${free?` (${free.meat} / ${free.rice} ก.)`:''}</button><button id="fp-week" class="ghost small">ใช้ค่าเฉลี่ยของสัปดาห์นี้</button></div>
+      <p class="small muted">ทุกวันได้เนื้อสัตว์และข้าวเท่ากันไม่ว่าเวรไหน วันที่ซื้อกิน 1 มื้อจะทำแค่ครึ่งเดียว พลังงานแต่ละวันจึงต่างจากเป้าได้บ้าง ดูยอดที่กินจริงได้ที่ "บันทึกการกิน" หน้าวันนี้${own?' · เมนูนี้ใช้แป้ง/เส้นแทนข้าว แอปให้พลังงานเท่ากับข้าวกล้องปริมาณเดียวกัน':''}</p>`
+    :`<p class="small muted">ตอนนี้แอปคำนวณข้าวและเนื้อสัตว์ใหม่ทุกวันตามพลังงานที่ใช้ในแต่ละเวร</p>`}
+  </div>`;
+}
+
+// ---------- what I actually ate ----------
+let eatDate=TODAY;
+const EAT_SLOTS=['m1','m2','s1'];
+const EAT_CATS=['bf','snack','fruit','dessert','drink','711','shop','custom'];
+const PORTIONS=[[0,'ไม่ได้กิน'],[0.5,'ครึ่งเดียว'],[1,'1 ที่'],[1.5,'1½ ที่'],[2,'2 ที่']];
+function eatGet(date){ const E=(state.eat=state.eat||{}); const L=E[date]=E[date]||{}; L.extra=L.extra||[]; return L; }
+function eatPeek(date){ return (state.eat||{})[date]||null; }
+function boxMacro(P){ const n=Math.max(P.boxes,1); return {k:P.main.k/n,p:P.main.p/n,c:P.main.c/n,f:P.main.f/n}; }
+function eatItemM(P,id){ if(!id) return {...Z}; if(id==='home') return P.boxes?boxMacro(P):{...Z}; return itemM(itemById(state,id)); }
+function eatItemName(P,id){ if(id==='home') return 'กล่องทำเอง: '+menuName(P.menu); const it=itemById(state,id); return it?it.n:'(รายการถูกลบ)'; }
+function eatenTotal(date){
+  const P=planDay(state,date), L=eatPeek(date); let t={...Z}, n=0;
+  if(L){
+    for(const s of EAT_SLOTS){ const e=L[s]; if(!e) continue; n++; if(e.id) t=addM(t,eatItemM(P,e.id),e.x); }
+    if(L.dr){ n++; for(const id of P.ch.drinks) t=addM(t,itemM(itemById(state,id)),L.dr.x); }
+    for(const e of (L.extra||[])){ n++; t=addM(t,eatItemM(P,e.id),e.x); }
+  }
+  return {P,t,n};
+}
+function eatToggle(date,slot){
+  const L=eatGet(date);
+  if(L[slot]){ delete L[slot]; return; }
+  if(slot==='dr'){ L.dr={x:1}; return; }
+  const plan=dayChoice(state,date)[slot]||'';
+  L[slot]={id:plan,x:plan?1:0};
+}
+function eatAdd(date,id){ eatGet(date).extra.push({id,x:1}); }
+function eatAllPlan(date){ const L=eatGet(date); for(const s of EAT_SLOTS) if(!L[s]) eatToggle(date,s); if(!L.dr&&dayChoice(state,date).drinks.length) eatToggle(date,'dr'); }
+function eatHeroLine(){
+  const {t,n,P}=eatenTotal(TODAY); if(!n) return '';
+  const left=P.E.target-t.k;
+  return `<div class="small">บันทึกว่ากินแล้ว <b class="num">${fmt(t.k)} kcal</b> · ${left>=0?`เหลือ ${fmt(left)}`:`<span style="color:var(--warn)">เกิน ${fmt(-left)}</span>`} kcal</div>`;
+}
+function eatCard(){
+  const date=eatDate; const {P,t}=eatenTotal(date); const L=eatPeek(date)||{}; const tg=P.E.target;
+  const homeOpt={none:false,home:P.boxes>0,homeLabel:`กล่องทำเอง: ${menuName(P.menu)} · ${Math.round(boxMacro(P).k)} kcal`};
+  const xsel=(cls,data,x)=>`<select class="${cls}" ${data} aria-label="ปริมาณ">${PORTIONS.map(([v,l])=>`<option value="${v}" ${Number(x)===v?'selected':''}>${l}</option>`).join('')}</select>`;
+  const row=(slot)=>{
+    const e=L[slot], plan=P.ch[slot]||'', id=e?e.id:plan, x=e?e.x:1, m=eatItemM(P,id);
+    return `<div class="eat-row"><button class="chk ${e?'on':''}" data-eat="${slot}" aria-pressed="${!!e}" aria-label="${e?'ยกเลิกบันทึก':'กินตามแผนแล้ว'} ${SLOT_T[slot]}"></button>
+      <div class="eat-main"><span class="slot-t">${SLOT_T[slot]}${e?'':' <span class="muted">· ยังไม่บันทึก</span>'}</span>
+        <select class="eat-sel searchable" data-slot="${slot}" aria-label="${SLOT_T[slot]} กินอะไร">${id?'':'<option value="" selected>— ไม่ได้วางแผนไว้ เลือกสิ่งที่กิน —</option>'}${itemOptions(id,EAT_CATS,homeOpt)}</select></div>
+      <div class="eat-side">${xsel('eat-x',`data-slot="${slot}"`,x)}<span class="num small ${e?'':'muted'}">${fmt(m.k*(e?e.x:x))} kcal</span></div></div>`;
+  };
+  const drs=P.ch.drinks.map(id=>itemById(state,id)).filter(Boolean);
+  const drK=drs.reduce((s,it)=>s+itemM(it).k,0);
+  const drRow=drs.length?`<div class="eat-row"><button class="chk ${L.dr?'on':''}" data-eat="dr" aria-pressed="${!!L.dr}" aria-label="${L.dr?'ยกเลิกบันทึก':'ดื่มตามแผนแล้ว'} เครื่องดื่ม"></button>
+      <div class="eat-main"><span class="slot-t">เครื่องดื่ม${L.dr?'':' <span class="muted">· ยังไม่บันทึก</span>'}</span><span class="small">${drs.map(it=>esc(it.n)).join(', ')}</span></div>
+      <div class="eat-side">${xsel('eat-x','data-slot="dr"',L.dr?L.dr.x:1)}<span class="num small ${L.dr?'':'muted'}">${fmt(drK*(L.dr?L.dr.x:1))} kcal</span></div></div>`:'';
+  const extra=(L.extra||[]).map((e,i)=>{const m=eatItemM(P,e.id);return `<div class="eat-row"><button class="ghost small" data-eatdel="${i}" aria-label="ลบ">×</button>
+      <div class="eat-main"><span class="slot-t">อื่นๆ</span><span class="small">${esc(eatItemName(P,e.id))}</span></div>
+      <div class="eat-side">${xsel('eat-xx',`data-i="${i}"`,e.x)}<span class="num small">${fmt(m.k*e.x)} kcal</span></div></div>`;}).join('');
+  const left=tg-t.k;
+  return `<section class="card" style="margin-top:12px" id="eat-card">
+    <div class="spread"><h2>บันทึกการกิน</h2>
+      <div class="row"><button id="eat-prev" aria-label="วันก่อน">‹</button><span class="small">${thDate(date)}${date===TODAY?' (วันนี้)':''}</span><button id="eat-next" aria-label="วันถัดไป">›</button>${date!==TODAY?'<button id="eat-today" class="ghost small">วันนี้</button>':''}</div></div>
+    <div class="hero-row">${ring(t.k,tg).replace('>ตามแผน<','>กินแล้ว<').replace('aria-label="แผน','aria-label="กินแล้ว')}<div><span class="big num">${fmt(t.k)}</span><span class="unit">kcal</span>
+      <div class="small muted">กินแล้ว จากเป้า ${fmt(tg)} · ${left>=0?`เหลือ ${fmt(left)}`:`เกิน ${fmt(-left)}`} kcal</div>
+      <div class="small">โปรตีน <b class="num">${Math.round(t.p)}</b>/${P.E.protein} ก. · คาร์บ <b class="num">${Math.round(t.c)}</b> ก. · ไขมัน <b class="num">${Math.round(t.f)}</b> ก.</div></div></div>
+    <p class="small muted">กด ✓ เมื่อกินตามแผน ถ้ากินอย่างอื่นให้เลือกจากรายการ (พิมพ์ชื่อค้นหาได้) แล้วปรับปริมาณ</p>
+    <div>${EAT_SLOTS.map(row).join('')}${drRow}${extra}</div>
+    <select id="eat-add" class="searchable" aria-label="เพิ่มอย่างอื่นที่กิน"><option value="" selected>+ เพิ่มอย่างอื่นที่กิน (พิมพ์ค้นหา)</option>${itemOptions('',EAT_CATS,{none:false,home:P.boxes>0,homeLabel:homeOpt.homeLabel})}</select>
+    <div class="row"><button id="eat-allplan">กินตามแผนทั้งหมด</button><span class="small muted">อาหารที่ไม่มีในรายการ เพิ่มได้ที่หน้าเมนู (จากฉลากหรือถ่ายรูป)</span></div>
+  </section>`;
+}
+
+// ---------- searchable pickers: every <select class="searchable"> gets a type-to-search box ----------
+function cbNorm(s){ return String(s||'').toLowerCase().replace(/\s+/g,' ').trim(); }
+function cbPlace(w){
+  const inp=w.querySelector('.cb-in'), list=w.querySelector('.cb-list'); if(!inp||!list) return;
+  const r=inp.getBoundingClientRect(); const vh=(window.visualViewport&&window.visualViewport.height)||window.innerHeight;
+  const below=vh-r.bottom-8, above=r.top-8, up=below<200&&above>below;
+  list.style.left=Math.max(4,r.left)+'px'; list.style.width=Math.max(r.width,Math.min(320,window.innerWidth-8))+'px';
+  if(r.left+list.offsetWidth>window.innerWidth-4) list.style.left=Math.max(4,window.innerWidth-4-list.offsetWidth)+'px';
+  list.style.maxHeight=Math.max(140,Math.min(340,up?above:below))+'px';
+  if(up){ list.style.top=''; list.style.bottom=(window.innerHeight-r.top+4)+'px'; } else { list.style.bottom=''; list.style.top=(r.bottom+4)+'px'; }
+}
+function enhanceSelects(root){
+  (root||document).querySelectorAll('select.searchable:not([data-cb])').forEach(sel=>{
+    sel.dataset.cb='1';
+    const wrap=document.createElement('div'); wrap.className='cb';
+    sel.parentNode.insertBefore(wrap,sel); wrap.appendChild(sel);
+    const inp=document.createElement('input'); inp.type='text'; inp.className='cb-in'; inp.autocomplete='off'; inp.spellcheck=false; inp.disabled=sel.disabled;
+    inp.setAttribute('role','combobox'); inp.setAttribute('aria-expanded','false'); inp.setAttribute('aria-autocomplete','list');
+    inp.setAttribute('aria-label',(sel.getAttribute('aria-label')||'เลือก')+' (พิมพ์เพื่อค้นหา)');
+    const list=document.createElement('div'); list.className='cb-list'; list.setAttribute('role','listbox'); list.hidden=true;
+    wrap.insertBefore(inp,sel); wrap.appendChild(list);
+    const opts=[...sel.querySelectorAll('option')].map(o=>({v:o.value,t:o.textContent,g:o.parentNode.tagName==='OPTGROUP'?o.parentNode.label:'',dis:o.disabled,always:o.dataset.always==='1',qt:o.dataset.qt||''}));
+    const curText=()=>{ const o=sel.options[sel.selectedIndex]; return o?o.textContent:''; };
+    const show=()=>{ inp.value=curText(); inp.title=inp.value; };
+    show();
+    let shown=[], act=-1;
+    const draw=(q)=>{
+      const toks=cbNorm(q).split(' ').filter(Boolean);
+      shown=opts.filter(o=>!o.dis&&!o.always&&(!toks.length||toks.every(t=>cbNorm(o.t+' '+o.g).includes(t)))).slice(0,150).concat(opts.filter(o=>o.always));
+      let g=null, html='';
+      shown.forEach((o,i)=>{ if(o.g!==g){ g=o.g; if(g) html+=`<div class="cb-g">${esc(g)}</div>`; }
+        html+=`<div class="cb-opt ${o.v===sel.value?'sel':''} ${i===act?'act':''}" role="option" data-i="${i}" aria-selected="${o.v===sel.value}">${esc(o.always&&o.qt&&q.trim()?o.qt.replace('{q}',q.trim()):o.t)}</div>`; });
+      list.innerHTML=html||`<div class="cb-empty">ไม่พบ "${esc(q)}" ลองพิมพ์คำสั้นลง</div>`;
+    };
+    const open=()=>{ if(!list.hidden) return; list.hidden=false; wrap.classList.add('open'); inp.setAttribute('aria-expanded','true'); inp.placeholder=curText()||'พิมพ์ค้นหา…'; inp.value=''; act=-1; draw(''); cbPlace(wrap);
+      const s=list.querySelector('.cb-opt.sel'); if(s) list.scrollTop=Math.max(0,s.offsetTop-list.clientHeight/2); };
+    const close=()=>{ if(list.hidden) return; list.hidden=true; wrap.classList.remove('open'); inp.setAttribute('aria-expanded','false'); inp.placeholder=''; show(); };
+    wrap._cbClose=close;
+    const pick=(o)=>{ sel.dataset.q=list.hidden?'':inp.value; close(); if(!o||o.v===sel.value) return; sel.value=o.v; show(); sel.dispatchEvent(new Event('change',{bubbles:true})); };
+    inp.addEventListener('focus',open); inp.addEventListener('click',open);
+    inp.addEventListener('input',()=>{ if(list.hidden) open(); act=inp.value?0:-1; draw(inp.value); });
+    inp.addEventListener('keydown',e=>{
+      if(e.key==='ArrowDown'||e.key==='ArrowUp'){ e.preventDefault(); if(list.hidden) open(); act=clamp(act+(e.key==='ArrowDown'?1:-1),0,shown.length-1); draw(inp.value); const a=list.querySelector('.cb-opt.act'); if(a) a.scrollIntoView({block:'nearest'}); }
+      else if(e.key==='Enter'){ e.preventDefault(); if(!list.hidden&&shown[act>=0?act:0]) pick(shown[act>=0?act:0]); }
+      else if(e.key==='Escape'){ close(); inp.blur(); }
+      else if(e.key==='Tab'){ close(); }
+    });
+    list.addEventListener('click',e=>{ e.preventDefault(); const el=e.target.closest('.cb-opt'); if(el) pick(shown[Number(el.dataset.i)]); });
+  });
+}
+document.addEventListener('pointerdown',e=>{ document.querySelectorAll('.cb.open').forEach(w=>{ if(!w.contains(e.target)) w._cbClose(); }); });
+document.addEventListener('focusin',e=>{ document.querySelectorAll('.cb.open').forEach(w=>{ if(!w.contains(e.target)) w._cbClose(); }); });
+const cbReplace=()=>document.querySelectorAll('.cb.open').forEach(cbPlace);
+window.addEventListener('scroll',cbReplace,true); window.addEventListener('resize',cbReplace);
+if(window.visualViewport) window.visualViewport.addEventListener('resize',cbReplace);
 
 // ---------- shopping tab ----------
 let shopWeek=mondayOf(TODAY), shopImg=null, downloadsApi=null;
@@ -1871,7 +2160,7 @@ function recipeCard(){
   return `<section class="card recipe" style="margin-top:12px">
     <div class="spread"><h2>วิธีทำอาหาร</h2><span class="small muted">${thDate(date)}${date===TODAY?' (วันนี้)':''}</span></div>
     ${tabs}
-    <div><span class="label">เมนูหลัก · ${P.boxes} กล่อง</span><h3 class="dish">${esc(m.n)}</h3></div>
+    <div><span class="label">เมนูหลัก · ${P.boxes} กล่อง</span><h3 class="dish">${esc(menuName(m))}</h3></div>
     <p class="small muted">${esc(m.how||'')}</p>
     <div class="grid cols-2">
       <div>
@@ -1897,13 +2186,13 @@ function recipeCard(){
 function sideRecipes(P){
   const slots=P.slots.filter(s=>s.it.comp&&s.slot!=='m1'&&s.slot!=='m2');
   if(!slots.length) return '';
-  const T={bf:'มื้อแรก',s1:'ว่าง 1',s2:'ว่าง 2',drink:'เครื่องดื่ม'};
-  return `<div class="sides"><h3>มื้อแรก อาหารว่าง และของทานเล่นที่ต้องเตรียม</h3>
-    ${slots.map(s=>{const it=s.it;const mm=s.m;return `<details class="side" ${s.slot==='bf'?'open':''}><summary><span class="pill good">${T[s.slot]||''}</span> <b>${esc(it.n)}</b> <span class="small muted num">${Math.round(mm.k)} kcal · P ${Math.round(mm.p)} ก.</span></summary>
+  const T={s1:'อาหารว่าง',drink:'เครื่องดื่ม'};
+  return `<div class="sides"><h3>อาหารว่างและของทานเล่นที่ต้องเตรียม</h3>
+    ${slots.map(s=>{const it=s.it;const mm=s.m;return `<details class="side" ${s.slot==='s1'?'open':''}><summary><span class="pill good">${T[s.slot]||''}</span> <b>${esc(it.n)}</b> <span class="small muted num">${Math.round(mm.k)} kcal · P ${Math.round(mm.p)} ก.</span></summary>
       <ul class="season">${it.comp.map(([k,g])=>`<li><span>${esc(ING[k].t.replace(/ \(มล\.\)/,''))}</span><b class="num">${/มล\./.test(ING[k].t)?g+' มล.':g+' ก.'}${ING[k].unit?` <span class="muted">≈ ${(g/ING[k].unit.g).toFixed(1).replace('.0','')} ${ING[k].unit.t}</span>`:''}</b></li>`).join('')}</ul>
       ${it.steps?`<ol class="steps small">${it.steps.map(x=>`<li>${esc(x)}</li>`).join('')}</ol>`:''}
     </details>`;}).join('')}
-    <p class="small muted">เปลี่ยนมื้อแรกหรืออาหารว่างได้ที่หน้าเมนู มีของทานเล่นทำเองให้เลือก เช่น ถั่วแระต้ม อกไก่อบกรอบ ปอเปี๊ยะสดกุ้ง เต้าหู้อบ ยำไข่ต้ม</p></div>`;
+    <p class="small muted">เปลี่ยนอาหารว่างได้ที่หน้าเมนู มีของทานเล่นทำเองให้เลือก เช่น ถั่วแระต้ม อกไก่อบกรอบ ปอเปี๊ยะสดกุ้ง เต้าหู้อบ ยำไข่ต้ม</p></div>`;
 }
 
 // ---------- Bluetooth ----------
@@ -2333,6 +2622,7 @@ function render(){
   document.querySelectorAll('nav.tabs a').forEach(a=>{if(a.getAttribute('href')==='#'+r)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');});
   const y=window.scrollY;
   $('#view').innerHTML=(typeof preView==='function'?preView(r):'')+ROUTES[r]();
+  enhanceSelects($('#view'));
   window.scrollTo(0,y);
 }
 window.addEventListener('hashchange',()=>{render();window.scrollTo(0,0);});
@@ -2345,6 +2635,7 @@ document.addEventListener('submit',e=>{
   if(f.id==='pform'){e.preventDefault();const p=state.profile;p.sex=$('#p-sex').value;p.age=Number($('#p-age').value);p.height=Number($('#p-height').value);p.startWeight=Number($('#p-start').value);p.goal=Number($('#p-goal').value);p.proteinX=Number($('#p-px').value)||1.5;p.carbMax=Number($('#p-carb').value);p.rice=$('#p-rice').value;p.startDate=$('#p-startdate').value||p.startDate;commit();toast('บันทึกแล้ว');return;}
   if(f.id==='bulk'){e.preventDefault();const start=$('#bulk-start').value;const toks=$('#bulk-text').value.trim().split(/[\s,]+/).filter(Boolean);let i=0,bad=[];for(const t of toks){const k=SHIFT_ALIASES[t.toLowerCase()]||SHIFT_ALIASES[t];if(!k){bad.push(t);continue;}state.shifts[addDays(start,i)]=k;i++;}commit();toast(bad.length?`ใส่ ${i} วัน · ข้ามคำที่ไม่รู้จัก: ${bad.join(' ')}`:`ใส่เวรแล้ว ${i} วัน`);return;}
   if(f.id==='exdlg-form'){e.preventDefault();const dlg=$('#exdlg');const k=$('#dlg-kcal').value;const e2={type:$('#dlg-type').value,min:Number($('#dlg-min').value)||30};if(k!==''){e2.kcal=Number(k);e2.src='นาฬิกา';}(state.ex[dlgDate]=state.ex[dlgDate]||[]).push(e2);dlg.close();commit();return;}
+  if(f.id==='meatai-form'){e.preventDefault();meatAi.date=meatAi.date||selDate;runMeatAi($('#meatai-q').value);return;}
   if(f.id==='aimenu-form'){e.preventDefault();runAiMenu($('#aimenu-q').value.trim());return;}
   if(f.id==='custom-form'){e.preventDefault();const n=$('#c-n').value.trim();if(!n)return;const it={id:'c_'+Date.now(),cat:'custom',n,m:{k:Number($('#c-k').value)||0,p:Number($('#c-p').value)||0,c:Number($('#c-c').value)||0,f:Number($('#c-f').value)||0}};const pr=Number($('#c-price').value);if(pr)it.price=pr;state.custom.push(it);commit();toast('เพิ่ม "'+n+'" ในรายการของฉันแล้ว เลือกได้ในช่องมื้ออาหาร');return;}
 });
@@ -2364,6 +2655,16 @@ document.addEventListener('change',e=>{
   else if(t.id==='rice-sel'){setDay(selDate,{rice:t.value});commit();}
   else if(t.classList.contains('slot-sel')){setDay(selDate,{[t.dataset.slot]:t.value});commit();}
   else if(t.id==='drink-add'){if(t.value){const d=dayChoice(state,selDate);setDay(selDate,{drinks:d.drinks.concat(t.value)});commit();}}
+  else if((t.id==='meat-sel'||t.classList.contains('wk-meat'))&&t.value==='__ai'){const d=t.dataset.date||selDate;meatAi.date=d;if(t.dataset.date)selDate=d;const q=(t.dataset.q||'').trim();if(q)runMeatAi(q);else{meatAi.open=true;render();const el=document.getElementById('meatai');if(el){el.scrollIntoView({behavior:'smooth',block:'center'});const i=document.getElementById('meatai-q');if(i)i.focus();}}}
+  else if(t.id==='meat-sel'){setDay(selDate,{meat:t.value});commit();}
+  else if(t.classList.contains('wk-meat')){setDay(t.dataset.date,{meat:t.value});commit();}
+  else if(t.classList.contains('mai-n')){if(meatAi.res){const v=Math.max(0,Number(t.value)||0);meatAi.res[t.dataset.f]=t.dataset.f==='price'?Math.round(v):v;meatAiCheck(meatAi.res);const nm=document.getElementById('mai-name');if(nm)meatAi.res.name=nm.value;render();}}
+  else if(t.id==='fp-on'){const f=state.profile.fixedPortion=Object.assign({},state.profile.fixedPortion||{});f.on=t.checked;if(f.on&&!(f.meat>0)){const v=freePortion(state,selDate)||weekFreePortion(state,selDate);if(v){f.meat=v.meat;f.rice=v.rice;}}commit();}
+  else if(t.id==='fp-meat'||t.id==='fp-rice'){const v=Number(t.value);if(t.value===''||!(v>=0)){render();return;}const f=state.profile.fixedPortion=Object.assign({on:true},state.profile.fixedPortion||{});f[t.id==='fp-meat'?'meat':'rice']=r5(v);commit();}
+  else if(t.classList.contains('eat-sel')){const L=eatGet(eatDate);const s=t.dataset.slot;L[s]={id:t.value,x:L[s]&&L[s].x?L[s].x:1};commit();}
+  else if(t.classList.contains('eat-x')){const L=eatGet(eatDate);const s=t.dataset.slot;const x=Number(t.value);if(s==='dr')L.dr={x};else L[s]={id:L[s]?L[s].id:(dayChoice(state,eatDate)[s]||''),x};commit();}
+  else if(t.classList.contains('eat-xx')){const e=eatGet(eatDate).extra[Number(t.dataset.i)];if(e)e.x=Number(t.value);commit();}
+  else if(t.id==='eat-add'){if(t.value){eatAdd(eatDate,t.value);commit();toast('เพิ่มในบันทึกการกินแล้ว');}}
   else if(t.id==='if-quick'||t.id==='if-mode'){const c=state.profile.ifast=state.profile.ifast||{};c.mode=t.value;commit();}
   else if(t.id==='if-skip'){const c=state.profile.ifast=state.profile.ifast||{};c.skipLong=t.checked;commit();}
   else if(t.classList.contains('if-start')){const c=state.profile.ifast=state.profile.ifast||{};c.start=Object.assign({},c.start||{},{[t.dataset.sh]:t.value||IF_START[t.dataset.sh]});commit();}
@@ -2410,6 +2711,19 @@ document.addEventListener('click',e=>{
   else if(t.id==='copy-week'){for(let i=0;i<7;i++){const s=state.shifts[addDays(rosterWeek,i)];if(s)state.shifts[addDays(rosterWeek,i+7)]=s;}commit();toast('คัดลอกเวรแล้ว');}
   else if(t.id==='d-prev'){selDate=addDays(selDate,-1);render();}
   else if(t.id==='d-next'){selDate=addDays(selDate,1);render();}
+  else if(t.id==='meatai-open'){meatAi.open=true;meatAi.date=selDate;render();const i=document.getElementById('meatai-q');if(i)i.focus();}
+  else if(t.id==='meatai-close'){meatAi={open:false,busy:false,q:'',res:null,err:'',date:null};render();}
+  else if(t.id==='meatai-use'){saveMeatAi(true);}
+  else if(t.id==='meatai-save'){saveMeatAi(false);}
+  else if(t.dataset.meatdel){const k=t.dataset.meatdel;delete state.customMeats[k];commit();toast('ลบแล้ว วันที่เคยใช้จะกลับไปใช้ตามสูตร');}
+  else if(t.id==='fp-today'){const v=freePortion(state,selDate);if(!v){toast('วันนี้ไม่ได้ทำกล่องเอง ลองเลือกวันอื่น');return;}state.profile.fixedPortion={on:true,meat:v.meat,rice:v.rice};commit();toast(`ทุกวัน: เนื้อสัตว์ ${v.meat} ก. ข้าวสุก ${v.rice} ก.`);}
+  else if(t.id==='fp-week'){const v=weekFreePortion(state,selDate);if(!v){toast('สัปดาห์นี้ไม่มีวันที่ทำกล่องเอง');return;}state.profile.fixedPortion={on:true,meat:v.meat,rice:v.rice};commit();toast(`ทุกวัน: เนื้อสัตว์ ${v.meat} ก. ข้าวสุก ${v.rice} ก.`);}
+  else if(t.dataset.eat){eatToggle(eatDate,t.dataset.eat);commit();}
+  else if(t.dataset.eatdel!=null){eatGet(eatDate).extra.splice(Number(t.dataset.eatdel),1);commit();}
+  else if(t.id==='eat-prev'){eatDate=addDays(eatDate,-1);render();}
+  else if(t.id==='eat-next'){eatDate=addDays(eatDate,1);render();}
+  else if(t.id==='eat-today'){eatDate=TODAY;render();}
+  else if(t.id==='eat-allplan'){eatAllPlan(eatDate);commit();toast('บันทึกว่ากินตามแผนแล้ว');}
   else if(t.id==='weigh-toggle'){weighMode=!weighMode;render();}
   else if(t.id==='weigh-clear'){delete state.weighed[selDate];commit();}
   else if(t.id==='scale-connect'){if(!scale.connected)connectScale();}
